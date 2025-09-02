@@ -1,5 +1,5 @@
 import waveResampler from 'wave-resampler';
-import { decode } from 'wav-decoder';
+const wav = require('node-wav');
 
 /**
  * Converts an array of Float32Array channel data into a single mono Float32Array.
@@ -144,7 +144,7 @@ export async function prepareAudio(fileUri: string, sampleRate: number) {
 
   console.log('-- Decoding WAV…');
   // Decode WAV buffer
-  const result = decode(arrayBuffer);
+  const result = wav.decode(arrayBuffer);
   console.log('-- Decoded channels=', result.channelData.length, 'origSR=', result.sampleRate);
   console.log('-- Converting to mono…');
 

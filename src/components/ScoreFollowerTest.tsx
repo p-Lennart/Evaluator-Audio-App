@@ -26,16 +26,18 @@ import { Audio, AVPlaybackStatus } from 'expo-av';
 import { decode } from 'wav-decoder';
 import { ScoreFollower } from '../audio/ScoreFollower';
 import { CENSFeatures } from '../audio/FeaturesCENS';
-import { FeaturesConstructor } from '../audio/features';
+import { FeaturesConstructor } from '../audio/Features';
 import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
 import TempoGraph from './TempoGraph';
-import { resampleAudio, toMono } from '../utils/audioUtils';
+import { prepareAudio, resampleAudio, toMono } from '../utils/audioUtils';
 import { calculateWarpedTimes, computeOfflineAlignmentPath, precomputeAlignmentPath } from '../utils/alignmentUtils';
 import { LiveFile, parseWebWavFile, pickMobileWavFile } from '../utils/fileSelectorUtils';
-import { loadCsvInfo } from '../utils/csvParsingUtils';
+import { CSVRow, loadCsvInfo } from '../utils/csvParsingUtils';
 import { refAssetMap } from '../score_name_to_data_map/scoreToCsvMap';
 import { csvAssetMap } from '../score_name_to_data_map/scoreToWavMap';
+
+import { calculateIntonation, testIntonation } from '../audio/Intonation';
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
@@ -43,13 +45,6 @@ interface ScoreFollowerTestProps {
   bpm?: number; // Optional BPM number,
   FeaturesCls?: FeaturesConstructor<any>;
   state: any;
-}
-
-interface CSVRow { // Interface used to store CSV info 
-  beat: number; // Start beat value of current row's note
-  refTime: number; // Reference audio timestamp of when current row's note will be played
-  liveTime: number; // Live audio timestamp of when current row's note will be played - used for testing purposes only
-  predictedTime: number; // Estimated live audio timestamp of when current row's note will be played
 }
 
 export default function ScoreFollowerTest({
@@ -95,6 +90,17 @@ export default function ScoreFollowerTest({
     setLiveFile(file);
   }
 
+  const runIntonation = async () => {
+    // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
+    // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
+
+    const audioUri = "/air_on_the_g_string/baseline/instrument_0.wav";
+    const csvUri = "/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv";
+
+
+    await testIntonation(audioUri, csvUri, 44100);
+  }
+
   const runFollower = async () => {
     if (!score) return; // Do nothing if no score is selected 
 
@@ -125,25 +131,14 @@ export default function ScoreFollowerTest({
       const sampleRate = sr; // Set sampleRate property of scorefollower
       frameSecRef.current = frameSize / sampleRate; // Duration of each frame in seconds
 
-      let buffer: ArrayBuffer; // Define an array buffer
+      const audioData = await prepareAudio(liveFile.uri, sampleRate);
 
-      console.log('-- Loading live audio buffer...');
-      buffer = await fetch(liveFile.uri).then(r => r.arrayBuffer()); // Web and mobile version of initializing array buffer given live uri 
-      console.log('-- Buffer loaded, byteLength=', buffer.byteLength);
-
-      console.log('-- Decoding WAV buffer...');
-      const result = await decode(buffer, { symmetric: true }); // Decode the WAV buffer into PCM audio data  - passed in symmetric = TRUE for better PCM samples when compared to the Python version
-      console.log('-- Decoded: channels=', result.channelData.length, 'origSR=', result.sampleRate);
-
-      let audioData = toMono(result.channelData); // Convert these PCM audio data to mono if needed 
-      audioData = resampleAudio(audioData, result.sampleRate, sampleRate) // Resample the resulting audio data if needed
       audioDataRef.current = audioData;
       console.log('-- Audio data prepared, length=', audioData.length);
 
       console.log('-- Computing alignment path...');
       pathRef.current = precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path 
       console.log('-- Alignment path length=', pathRef.current.length);
-
 
       // const rawPath = computeOfflineAlignmentPath(refFeatures, audioDataRef.current, FeaturesCls, sr, winLen)
       // console.log("raw path: ", rawPath) // Just print to console log for now
@@ -171,7 +166,7 @@ export default function ScoreFollowerTest({
           refTimes
         );
 
-        // Update CSV Interface with predicted live times for each note 
+        // Update CSV struct arr with predicted live times for each note 
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
           ...row,
           predictedTime: predictedTimes[i],
@@ -228,6 +223,17 @@ export default function ScoreFollowerTest({
 
   return (
     <View>
+      {/* Test intonation Performance button */}
+      <TouchableOpacity
+        style={[styles.button]}
+        onPress={runIntonation} 
+      >
+        <Text style={styles.buttonText}>
+          {'Test intonation'}
+        </Text>
+      </TouchableOpacity>
+      {/* End test intonation button */}
+
       {/* Show tempo of selected score to be played */}
       {bpm ? (
         <Text style={styles.tempoText}>Reference Tempo: {bpm} BPM</Text>
