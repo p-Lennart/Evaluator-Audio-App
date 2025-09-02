@@ -1,6 +1,6 @@
 // External file used in ScoreDisplay.tsx to display the mapped score's content visually
 // key (string) = score's name
-// value (string) = score's XML file 
+// value (string) = score's XML file
 const scoresData: Record<string, string> = {
   "schumann_melodyVLCduet.musicxml": `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
@@ -1547,7 +1547,7 @@ const scoresData: Record<string, string> = {
     </part>
   </score-partwise>
 `,
-"sonata.musicxml" : `<?xml version="1.0" encoding="UTF-8"?>
+  "sonata.musicxml": `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="4.0">
 <work>
@@ -3137,7 +3137,7 @@ const scoresData: Record<string, string> = {
     </part>
   </score-partwise>
 `,
-"hark.musicxml" : `<?xml version="1.0" encoding="UTF-8"?>
+  "hark.musicxml": `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="4.0">
 <work>
@@ -4140,7 +4140,7 @@ const scoresData: Record<string, string> = {
     </part>
   </score-partwise>
 `,
-"air_on_the_g_string.musicxml" : `<?xml version="1.0" encoding="UTF-8"?>
+  "air_on_the_g_string.musicxml": `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="4.0">
 <work>
@@ -6164,7 +6164,7 @@ const scoresData: Record<string, string> = {
     </part>
   </score-partwise>
 `,
-'ode_to_joy.musicxml' : `<?xml version="1.0" encoding="UTF-8"?>
+  "ode_to_joy.musicxml": `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="4.0">
 <work>
@@ -7045,7 +7045,7 @@ const scoresData: Record<string, string> = {
     </part>
   </score-partwise>
 `,
-"green_sleeves.musicxml": `<?xml version="1.0" encoding="UTF-8"?>
+  "green_sleeves.musicxml": `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="4.0">s
 <work>
@@ -8463,8 +8463,7 @@ const scoresData: Record<string, string> = {
       </measure>
     </part>
   </score-partwise>
-`
+`,
+};
 
-}
-
-export default scoresData
+export default scoresData;

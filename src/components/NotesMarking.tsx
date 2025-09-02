@@ -1,24 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Platform,
-  TextInput,
-} from 'react-native';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
-import { decode as atob } from 'base-64';
-import { Midi } from '@tonejs/midi';
-import RNPickerSelect from 'react-native-picker-select';
-import { WebView } from 'react-native-webview';
-import { musicXMLString } from './exampleMusicXML';
-import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, Platform } from "react-native";
+import { Asset } from "expo-asset";
+import * as FileSystem from "expo-file-system";
+import { decode as atob } from "base-64";
+import { Midi } from "@tonejs/midi";
+import { WebView } from "react-native-webview";
+import { musicXMLString } from "./exampleMusicXML";
+import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 
-const midiAsset = require('../../assets/midi/ode_to_joy_baseline.mid');
-const intonationArray = [0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0];
-
+const midiAsset = require("../../assets/midi/ode_to_joy_baseline.mid");
+const intonationArray = [
+  0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5,
+  1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0,
+  -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2,
+  0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1, -0.2, 0.0, -0.5, 1.0, 0.1,
+  -0.2, 0.0, -0.5, 1.0,
+];
 
 type MidiNoteInfo = {
   name: string;
@@ -26,7 +23,9 @@ type MidiNoteInfo = {
 
 export default function MusicXMLNoteSelector() {
   const [midiNotes, setMidiNotes] = useState<MidiNoteInfo[]>([]);
-  const [selectedNoteIndex, setSelectedNoteIndex] = useState<number | undefined>(undefined);
+  const [selectedNoteIndex, setSelectedNoteIndex] = useState<
+    number | undefined
+  >(undefined);
   const [markedXML, setMarkedXML] = useState<string | null>(null);
 
   const osmdContainerRef = useRef<HTMLDivElement>(null);
@@ -36,16 +35,18 @@ export default function MusicXMLNoteSelector() {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS === 'web' && markedXML && osmdContainerRef.current) {
+    if (Platform.OS === "web" && markedXML && osmdContainerRef.current) {
       const osmd = new OpenSheetMusicDisplay(osmdContainerRef.current, {
         autoResize: true,
-        backend: 'svg',
+        backend: "svg",
       });
       // osmd.load(markedXML).then(() => osmd.render());
-      osmd.load(markedXML).then(() => osmd.render())
-      .catch(e => {
-      console.error("OSMD load error:", e);
-  });
+      osmd
+        .load(markedXML)
+        .then(() => osmd.render())
+        .catch((e) => {
+          console.error("OSMD load error:", e);
+        });
     }
   }, [markedXML]);
 
@@ -54,7 +55,7 @@ export default function MusicXMLNoteSelector() {
     await asset.downloadAsync();
     const uri = asset.localUri || asset.uri;
 
-    if (Platform.OS === 'web') {
+    if (Platform.OS === "web") {
       const response = await fetch(uri);
       const arrayBuffer = await response.arrayBuffer();
       return new Midi(new Uint8Array(arrayBuffer));
@@ -86,49 +87,59 @@ export default function MusicXMLNoteSelector() {
   // };
 
   const loadMidi = async () => {
-  try {
-    const midi = await loadMidiFromAsset(midiAsset);
-    const notes = midi.tracks.flatMap((track) =>
-      track.notes.map((note) => ({
-        name: note.name,
-      }))
-    );
-    setMidiNotes(notes);
+    try {
+      const midi = await loadMidiFromAsset(midiAsset);
+      const notes = midi.tracks.flatMap((track) =>
+        track.notes.map((note) => ({
+          name: note.name,
+        })),
+      );
+      setMidiNotes(notes);
 
-    const fullMarkedXML = highlightAllNotesByIntonationArray(musicXMLString, notes, intonationArray);
-    setMarkedXML(fullMarkedXML);
-
-  } catch (e) {
-    console.error('Failed to load MIDI or highlight notes:', e);
-  }
+      const fullMarkedXML = highlightAllNotesByIntonationArray(
+        musicXMLString,
+        notes,
+        intonationArray,
+      );
+      setMarkedXML(fullMarkedXML);
+    } catch (e) {
+      console.error("Failed to load MIDI or highlight notes:", e);
+    }
   };
 
   const highlightAllNotesByIntonationArray = (
     xml: string,
     midiNotes: MidiNoteInfo[],
-    intonations: number[]
+    intonations: number[],
   ): string => {
     let updatedXML = xml;
 
     for (let i = 0; i < intonations.length; i++) {
-      const intonation = intonations[i]
-      if (intonation == 0) continue;
+      const intonation = intonations[i];
+      if (intonation === 0) continue;
       const note = midiNotes[i];
       const step = note.name[0];
       const octave = parseInt(note.name.slice(-1));
-      const samePitchIndex = midiNotes.slice(0, i).filter(n => n.name === note.name).length;
-      const color = intonations[i] < 0 ? '#0000FF' : '#FF0000';
+      const samePitchIndex = midiNotes
+        .slice(0, i)
+        .filter((n) => n.name === note.name).length;
+      const color = intonations[i] < 0 ? "#0000FF" : "#FF0000";
 
-      updatedXML = markSingleNoteInMusicXMLByIndex(updatedXML, { step, octave }, samePitchIndex, color);
+      updatedXML = markSingleNoteInMusicXMLByIndex(
+        updatedXML,
+        { step, octave },
+        samePitchIndex,
+        color,
+      );
     }
 
     return updatedXML;
   };
 
-  const getIndexAmongSamePitches = (notes: MidiNoteInfo[], index: number) => {
-    const targetName = notes[index].name;
-    return notes.slice(0, index).filter(n => n.name === targetName).length;
-  };
+  // const getIndexAmongSamePitches = (notes: MidiNoteInfo[], index: number) => {
+  //   const targetName = notes[index].name;
+  //   return notes.slice(0, index).filter((n) => n.name === targetName).length;
+  // };
 
   // const handleNoteSelect = (index: number | undefined) => {
   //   setSelectedNoteIndex(index);
@@ -144,83 +155,88 @@ export default function MusicXMLNoteSelector() {
   //   }
   // };
 
-const markSingleNoteInMusicXMLByIndex = (
-  xml: string,
-  target: { step: string; octave: number },
-  targetIndex: number,
-  highlightColor: string
-): string => {
-  const lines = xml.split('\n');
-  let inNote = false;
-  let stepMatched = false;
-  let octaveMatched = false;
-  let currentStep = '';
-  let currentOctave = '';
-  let matchCounter = 0;
-  let buffer: string[] = [];
-  let output: string[] = [];
+  const markSingleNoteInMusicXMLByIndex = (
+    xml: string,
+    target: { step: string; octave: number },
+    targetIndex: number,
+    highlightColor: string,
+  ): string => {
+    const lines = xml.split("\n");
+    let inNote = false;
+    let stepMatched = false;
+    let octaveMatched = false;
+    let currentStep = "";
+    let currentOctave = "";
+    let matchCounter = 0;
+    let buffer: string[] = [];
+    let output: string[] = [];
 
-  for (let line of lines) {
-    if (line.includes('<note')) {
-      inNote = true;
-      buffer = [line];
-    } else if (inNote) {
-      buffer.push(line);
-    } else {
-      output.push(line);
-      continue;
-    }
+    for (let line of lines) {
+      if (line.includes("<note")) {
+        inNote = true;
+        buffer = [line];
+      } else if (inNote) {
+        buffer.push(line);
+      } else {
+        output.push(line);
+        continue;
+      }
 
-    if (line.includes('<step>')) {
-      currentStep = line.replace(/.*<step>(.*?)<\/step>.*/, '$1');
-      stepMatched = true;
-    }
+      if (line.includes("<step>")) {
+        currentStep = line.replace(/.*<step>(.*?)<\/step>.*/, "$1");
+        stepMatched = true;
+      }
 
-    if (line.includes('<octave>')) {
-      currentOctave = line.replace(/.*<octave>(.*?)<\/octave>.*/, '$1');
-      octaveMatched = true;
-    }
+      if (line.includes("<octave>")) {
+        currentOctave = line.replace(/.*<octave>(.*?)<\/octave>.*/, "$1");
+        octaveMatched = true;
+      }
 
-    if (line.includes('</note>')) {
-      inNote = false;
+      if (line.includes("</note>")) {
+        inNote = false;
 
-      if (stepMatched && octaveMatched) {
-        if (
-          currentStep === target.step &&
-          parseInt(currentOctave) === target.octave
-        ) {
-          if (matchCounter === targetIndex) {
-            const modified = buffer.map((l, i) => {
-            if (i === 0 && l.trim().startsWith('<note') && !l.includes('color=')) {
-              return l.replace('<note', `<note color="${highlightColor}"`);
+        if (stepMatched && octaveMatched) {
+          if (
+            currentStep === target.step &&
+            parseInt(currentOctave) === target.octave
+          ) {
+            if (matchCounter === targetIndex) {
+              const modified = buffer.map((l, i) => {
+                if (
+                  i === 0 &&
+                  l.trim().startsWith("<note") &&
+                  !l.includes("color=")
+                ) {
+                  return l.replace("<note", `<note color="${highlightColor}"`);
+                }
+                return l;
+              });
+
+              output.push(...modified);
+            } else {
+              output.push(...buffer);
             }
-            return l;
-          });
-
-            output.push(...modified);
+            matchCounter++;
           } else {
             output.push(...buffer);
           }
-          matchCounter++;
         } else {
           output.push(...buffer);
         }
-      } else {
-        output.push(...buffer);
+
+        buffer = [];
+        stepMatched = false;
+        octaveMatched = false;
       }
-
-      buffer = [];
-      stepMatched = false;
-      octaveMatched = false;
     }
-  }
 
-  return output.join('\n');
-};
-
+    return output.join("\n");
+  };
 
   const buildHtml = (xml: string) => {
-    const escaped = xml.replace(/`/g, '\\`').replace(/<\/script>/g, '<\\/script>');
+    const escaped = xml
+      .replace(/`/g, "\\`")
+      .replace(/<\/script>/g, "<\\/script>");
     return `
       <!DOCTYPE html>
       <html>
@@ -273,17 +289,17 @@ const markSingleNoteInMusicXMLByIndex = (
         <>
           <Text style={styles.header}> Rendered MusicXML</Text>
 
-          {Platform.OS === 'web' ? (
+          {Platform.OS === "web" ? (
             <View style={styles.webContainer}>
-              <div ref={osmdContainerRef} style={{ width: '100%' }} />
+              <div ref={osmdContainerRef} style={{ width: "100%" }} />
             </View>
           ) : (
             <View style={{ height: 300 }}>
               <WebView
-                originWhitelist={['*']}
+                originWhitelist={["*"]}
                 javaScriptEnabled
                 source={{ html: buildHtml(markedXML) }}
-                style={{ backgroundColor: 'white' }}
+                style={{ backgroundColor: "white" }}
               />
             </View>
           )}
@@ -302,11 +318,10 @@ const markSingleNoteInMusicXMLByIndex = (
 
 // ... styles remain unchanged
 
-
 const styles = StyleSheet.create({
   header: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     margin: 10,
   },
   notesBox: {
@@ -320,17 +335,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#aaa',
+    borderColor: "#aaa",
     borderRadius: 5,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
   },
   xmlBox: {
     flex: 1,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: '#fdf6e3',
+    backgroundColor: "#fdf6e3",
     borderTopWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     margin: 10,
     borderRadius: 5,
   },
@@ -339,6 +354,6 @@ const styles = StyleSheet.create({
     minHeight: 300,
     marginHorizontal: 10,
     marginBottom: 10,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
 });

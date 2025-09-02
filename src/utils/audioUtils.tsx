@@ -1,4 +1,4 @@
-import waveResampler from 'wave-resampler';
+import waveResampler from "wave-resampler";
 
 /**
  * Converts an array of Float32Array channel data into a single mono Float32Array.
@@ -7,8 +7,7 @@ import waveResampler from 'wave-resampler';
  * @param channelData - Array of Float32Array, one per channel
  * @returns A Float32Array containing the mono audio data
  */
-export const toMono = (channelData: Float32Array[]): Float32Array =>
-{
+export const toMono = (channelData: Float32Array[]): Float32Array => {
   // If already mono, just return the single channel
   if (channelData.length === 1) {
     return channelData[0];
@@ -32,7 +31,7 @@ export const toMono = (channelData: Float32Array[]): Float32Array =>
   }
 
   return mono;
-}
+};
 
 /**
  * Resamples a Float32Array of audio data from one sample rate to another.
@@ -46,48 +45,40 @@ export const toMono = (channelData: Float32Array[]): Float32Array =>
 export const resampleAudio = (
   audioData: Float32Array,
   srcRate: number,
-  destRate: number
-): Float32Array =>
-{
+  destRate: number,
+): Float32Array => {
   // If sample rates match, no resampling is needed — return original data
   if (srcRate === destRate) {
     return audioData;
   }
 
   // Use the waveResampler library to convert between sample rates
-  const resampled = waveResampler.resample(
-    audioData,
-    srcRate,
-    destRate
-  );
+  const resampled = waveResampler.resample(audioData, srcRate, destRate);
 
   // Normalize output to always be Float32Array
   return resampled instanceof Float32Array
     ? resampled
     : Float32Array.from(resampled as number[]);
-}
+};
 
 /**
  * Download the first 1000 samples of audioData in Python‑style text format.
  */
 // Can ignore these, only used when comparing PCM samples that we were getting from TS vs Python
 export function downloadFullPCM(
-  audioData: Float32Array, 
-  filename = 'ts_first100_pcm.txt'
-): void 
-{
+  audioData: Float32Array,
+  filename = "ts_first100_pcm.txt",
+): void {
   // Grab the first 1000 samples
   const slice100 = audioData.slice(0, 1000);
 
   // Format like Python does
-  const text = Array.from(slice100)
-    .map(pythonFormat)
-    .join('\n');
+  const text = Array.from(slice100).map(pythonFormat).join("\n");
 
   // Trigger download in browser
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -97,33 +88,32 @@ export function downloadFullPCM(
 }
 
 // Can ignore these, only used when comparing PCM samples that we were getting from TS vs Python
-export function pythonFormat(v : number): string 
-{
+export function pythonFormat(v: number): string {
   // Python prints "0.0" for zero
-  if (Object.is(v, 0)) return '0.0';
+  if (Object.is(v, 0)) return "0.0";
 
   const absV = Math.abs(v);
   const expVal = Math.floor(Math.log10(absV));
 
   // Python repr/str uses exponential for exp < -4 or exp >= 17
   if (expVal < -4 || expVal >= 17) {
-  // Generate a long exponential, then strip unneeded zeros
-  let [mant, exp] = v.toExponential(16).split('e');
+    // Generate a long exponential, then strip unneeded zeros
+    let [mant, exp] = v.toExponential(16).split("e");
 
-  // Trim trailing zeros from mantissa, then any stray dot
-  mant = mant.replace(/(\.\d*?[1-9])0+$/, '$1').replace(/\.$/, '');
+    // Trim trailing zeros from mantissa, then any stray dot
+    mant = mant.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.$/, "");
 
-  // Normalize exponent sign and pad to 2 digits
-  let sign = exp[0];
-  let digits = exp.slice(1);
-  if (sign !== '+' && sign !== '-') {
+    // Normalize exponent sign and pad to 2 digits
+    let sign = exp[0];
+    let digits = exp.slice(1);
+    if (sign !== "+" && sign !== "-") {
       // unlikely, but just in case
       digits = sign + digits;
-      sign = '+';
-  }
-  if (digits.length < 2) digits = '0' + digits;
+      sign = "+";
+    }
+    if (digits.length < 2) digits = "0" + digits;
 
-  return mant + 'e' + sign + digits;
+    return mant + "e" + sign + digits;
   } else {
     // Fixed decimal: JS’s toString gives the shortest fixed repr for 1e‑4 ≤ |v| < 1e17
     return v.toString();
