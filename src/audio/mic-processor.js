@@ -1,7 +1,7 @@
 /* eslint-env es2021, browser */
 /* global AudioWorkletProcessor, registerProcessor */
 
-// A custom audio processor that captures live microphone audio 
+// A custom audio processor that captures live microphone audio
 // and sends 4096-sample chunks to App.tsx for further processing
 class MicProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -34,4 +34,4 @@ class MicProcessor extends AudioWorkletProcessor {
   }
 }
 // Register this processor under the name 'mic-processor' for it to be used by App.tsx using addModule()
-registerProcessor('mic-processor', MicProcessor);
+registerProcessor("mic-processor", MicProcessor);

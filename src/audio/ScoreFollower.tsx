@@ -1,8 +1,8 @@
-const wav = require('node-wav');
+import { resampleAudio, toMono } from "../utils/audioUtils";
+import { Features, FeaturesConstructor } from "./Features";
+import OnlineTimeWarping from "./OnlineTimeWarping";
 
-import { resampleAudio, toMono } from '../utils/audioUtils';
-import { Features, FeaturesConstructor } from './features';
-import OnlineTimeWarping from './OnlineTimeWarping';
+const wav = require("node-wav");
 
 /**
  * Performs online dynamic time warping (DTW) between reference audio and live microphone audio.
@@ -11,14 +11,18 @@ export class ScoreFollower {
   FeaturesClass: FeaturesConstructor<any>;
   sr: number;
   winLen: number;
-  path: Array<[number, number]>;
+  path: [number, number][];
   ref!: Features<unknown>;
   otw!: OnlineTimeWarping;
 
   /**
    * Private constructor. Use the static async create() method to instantiate.
    */
-  private constructor(FeaturesClass: FeaturesConstructor<any>, sr: number, winLen: number) {
+  private constructor(
+    FeaturesClass: FeaturesConstructor<any>,
+    sr: number,
+    winLen: number,
+  ) {
     this.FeaturesClass = FeaturesClass;
     this.sr = sr;
     this.winLen = winLen;
@@ -42,15 +46,31 @@ export class ScoreFollower {
     maxRunCount = 3,
     diagWeight = 0.75,
     sr = 44100,
-    winLen = 4096, 
+    winLen = 4096,
     hopLen = winLen,
   ) {
     const instance = new ScoreFollower(FeaturesClass, sr, winLen);
-    instance.ref = await instance.loadRefFromAudio(refUri, FeaturesClass, sr, winLen, hopLen);
-    console.log('-- Reference loaded — initializing OTW with bigC=', bigC, 'maxRunCount=', maxRunCount);
+    instance.ref = await instance.loadRefFromAudio(
+      refUri,
+      FeaturesClass,
+      sr,
+      winLen,
+      hopLen,
+    );
+    console.log(
+      "-- Reference loaded — initializing OTW with bigC=",
+      bigC,
+      "maxRunCount=",
+      maxRunCount,
+    );
 
-    instance.otw = new OnlineTimeWarping(instance.ref, bigC, maxRunCount, diagWeight);
-    console.log('ScoreFollower.create(): done');
+    instance.otw = new OnlineTimeWarping(
+      instance.ref,
+      bigC,
+      maxRunCount,
+      diagWeight,
+    );
+    console.log("ScoreFollower.create(): done");
 
     return instance;
   }
@@ -76,39 +96,45 @@ export class ScoreFollower {
     FeaturesClass: FeaturesConstructor<any>,
     sr: number,
     winLen: number,
-    hopLen: number = winLen
+    hopLen: number = winLen,
   ) {
-
-    console.log('ScoreFollower.loadRefFromAudio(): fetching', refUri);
+    console.log("ScoreFollower.loadRefFromAudio(): fetching", refUri);
 
     // Fetch the WAV file as ArrayBuffer
     const res = await fetch(refUri);
     if (!res.ok) {
-        throw new Error(`Failed to fetch ${refUri}: ${res.status} ${res.statusText}`);
+      throw new Error(
+        `Failed to fetch ${refUri}: ${res.status} ${res.statusText}`,
+      );
     }
-    
+
     const arrayBuffer = await res.arrayBuffer();
 
-    console.log('-- Fetched buffer byteLength=', arrayBuffer.byteLength);
+    console.log("-- Fetched buffer byteLength=", arrayBuffer.byteLength);
 
-    console.log('-- Decoding WAV…');
+    console.log("-- Decoding WAV…");
     // Decode WAV buffer
     const result = wav.decode(arrayBuffer);
-    console.log('-- Decoded channels=', result.channelData.length, 'origSR=', result.sampleRate);
-    console.log('-- Converting to mono…');
+    console.log(
+      "-- Decoded channels=",
+      result.channelData.length,
+      "origSR=",
+      result.sampleRate,
+    );
+    console.log("-- Converting to mono…");
 
-    // Convert to Mono if needed 
+    // Convert to Mono if needed
     let audioData = toMono(result.channelData);
     console.log(`-- Resampling from ${result.sampleRate} → ${sr}…`);
 
-    // Resample if needed 
-    audioData = resampleAudio(audioData, result.sampleRate, sr)
-    console.log('-- Resampled data length=', audioData.length);
+    // Resample if needed
+    audioData = resampleAudio(audioData, result.sampleRate, sr);
+    console.log("-- Resampled data length=", audioData.length);
 
-    console.log('-- Building featuregram…');
+    console.log("-- Building featuregram…");
 
     const features = new FeaturesClass(sr, winLen, audioData, hopLen);
-    console.log('-- Featuregram length=', features.featuregram.length);
+    console.log("-- Featuregram length=", features.featuregram.length);
 
     return features;
   }
@@ -118,11 +144,11 @@ export class ScoreFollower {
    * @param b Number of steps to go back
    * @returns Backwards path as list of (refIndex, liveIndex)
    */
-  getBackwardsPath(b: number): Array<[number, number]> {
+  getBackwardsPath(b: number): [number, number][] {
     const costMatrix = this.otw.accumulatedCost;
     let j = this.otw.refIdx;
     let t = this.otw.liveIdx;
-    const backwardsPath: Array<[number, number]> = [];
+    const backwardsPath: [number, number][] = [];
 
     while (j > this.otw.refIdx - b && !backwardsPath.includes([0, 0])) {
       const down = costMatrix[j - 1][t];
@@ -152,9 +178,9 @@ export class ScoreFollower {
    * @param backPath Backwards path
    * @returns Path elements in forward path but not in backPath
    */
-  getPathDifference(backPath: Array<[number, number]>): Array<[number, number]> {
+  getPathDifference(backPath: [number, number][]): [number, number][] {
     return this.path.filter(
-      ([r, l]) => !backPath.some(([br, bl]) => br === r && bl === l)
+      ([r, l]) => !backPath.some(([br, bl]) => br === r && bl === l),
     );
   }
 }
