@@ -26,7 +26,7 @@ import { Audio, AVPlaybackStatus } from "expo-av";
 import { decode } from "wav-decoder";
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { CENSFeatures } from "../audio/FeaturesCENS";
-import { FeaturesConstructor } from "../audio/features";
+import { FeaturesConstructor } from "../audio/Features";
 import { Platform } from "react-native";
 import { Asset } from "expo-asset";
 import TempoGraph from "./TempoGraph";

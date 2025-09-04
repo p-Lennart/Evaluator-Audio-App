@@ -1,5 +1,5 @@
 import { ScoreFollower } from "../ScoreFollower";
-import { Features } from "../features";
+import { Features } from "../Features";
 
 // Mock node-wav decode
 jest.mock("node-wav", () => ({

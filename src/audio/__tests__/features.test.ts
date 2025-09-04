@@ -1,4 +1,4 @@
-import { Features } from "../../audio/features";
+import { Features } from "../Features";
 
 class TestFeatures extends Features<number[]> {
   compareFeatures(vec1: number[], vec2: number[]): number {

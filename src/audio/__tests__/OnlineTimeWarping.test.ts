@@ -1,5 +1,5 @@
 import OnlineTimeWarping from "../../audio/OnlineTimeWarping";
-import { Features } from "../../audio/features";
+import { Features } from "../Features";
 
 class MinimalFeatures extends Features<number[]> {
   compareFeatures(vec1: number[], vec2: number[]): number {

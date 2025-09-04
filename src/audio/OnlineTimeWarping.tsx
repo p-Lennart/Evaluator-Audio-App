@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { Features } from "./features";
+import { Features } from "./Features";
 
 function argmin(arr: number[]): number {
   return arr.reduce(

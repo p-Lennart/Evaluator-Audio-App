@@ -20,7 +20,7 @@
 // > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // > THE SOFTWARE.
 
-import { FeaturesConstructor } from "../audio/features";
+import { FeaturesConstructor } from "../audio/Features";
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { dot } from "../audio/FeaturesCENS";
 import DynamicTimeWarping from "dynamic-time-warping-ts";
