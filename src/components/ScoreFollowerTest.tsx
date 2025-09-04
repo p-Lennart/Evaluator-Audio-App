@@ -73,7 +73,7 @@ export default function ScoreFollowerTest({
   const soundRef = useRef<Audio.Sound | null>(null); // Reference to Audio Component
   const followerRef = useRef<ScoreFollower | null>(null); // Reference to score follower instance
   const audioDataRef = useRef<Float32Array>(new Float32Array()); // Reference to decoded audio sample data
-  const pathRef = useRef<Array<[number, number]>>([]); // Reference to alignment path
+  const pathRef = useRef<[number, number][]>([]); // Reference to alignment path
   const inputRef = useRef<HTMLInputElement>(null); // Reference to the file select HTML element
   const frameSecRef = useRef<number>(0); // Reference to duration of each frame in seconds
   const csvDataRef = useRef<CSVRow[]>([]); // Array that contains CSV rows (CSV row == info on a note in a selected score)

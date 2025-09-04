@@ -1,8 +1,8 @@
-const wav = require("node-wav");
-
 import { resampleAudio, toMono } from "../utils/audioUtils";
 import { Features, FeaturesConstructor } from "./features";
 import OnlineTimeWarping from "./OnlineTimeWarping";
+
+const wav = require("node-wav");
 
 /**
  * Performs online dynamic time warping (DTW) between reference audio and live microphone audio.
@@ -11,7 +11,7 @@ export class ScoreFollower {
   FeaturesClass: FeaturesConstructor<any>;
   sr: number;
   winLen: number;
-  path: Array<[number, number]>;
+  path: [number, number][];
   ref!: Features<unknown>;
   otw!: OnlineTimeWarping;
 
@@ -144,11 +144,11 @@ export class ScoreFollower {
    * @param b Number of steps to go back
    * @returns Backwards path as list of (refIndex, liveIndex)
    */
-  getBackwardsPath(b: number): Array<[number, number]> {
+  getBackwardsPath(b: number): [number, number][] {
     const costMatrix = this.otw.accumulatedCost;
     let j = this.otw.refIdx;
     let t = this.otw.liveIdx;
-    const backwardsPath: Array<[number, number]> = [];
+    const backwardsPath: [number, number][] = [];
 
     while (j > this.otw.refIdx - b && !backwardsPath.includes([0, 0])) {
       const down = costMatrix[j - 1][t];
@@ -178,9 +178,7 @@ export class ScoreFollower {
    * @param backPath Backwards path
    * @returns Path elements in forward path but not in backPath
    */
-  getPathDifference(
-    backPath: Array<[number, number]>,
-  ): Array<[number, number]> {
+  getPathDifference(backPath: [number, number][]): [number, number][] {
     return this.path.filter(
       ([r, l]) => !backPath.some(([br, bl]) => br === r && bl === l),
     );

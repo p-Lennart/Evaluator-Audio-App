@@ -1,4 +1,4 @@
-// Hash map - score name -> score' MIDI file 
+// Hash map - score name -> score' MIDI file
 const scoreToMidi: Record<string, number> = {
   "air_on_the_g_string.musicxml": require("../../assets/midi/air_on_the_g_string.mid"),
   "schumann_melodyVLCduet.musicxml": require("../../assets/midi/schumann_melodyVLCduet.mid"),

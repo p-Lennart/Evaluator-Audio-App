@@ -161,7 +161,7 @@ export const computeOfflineAlignmentPath = (
   FeaturesCls: FeaturesConstructor<any>,
   sampleRate: number,
   windowLength: number,
-): Array<[number, number]> => {
+): [number, number][] => {
   // Get live features
   const liveExtractor = new FeaturesCls(
     sampleRate,

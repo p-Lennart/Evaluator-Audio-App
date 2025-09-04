@@ -9,7 +9,6 @@ import {
   Switch,
   Modal,
   TouchableWithoutFeedback,
-  Platform,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import Icon from "react-native-vector-icons/FontAwesome";

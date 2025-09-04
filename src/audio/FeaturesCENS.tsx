@@ -124,14 +124,14 @@ export class CENSFeatures extends Features<number[]> {
   hanningWindow: number[];
   cFC: number[][]; // conversion matrix from FFT bins to chroma (12) bins
 
-  constructor(
-    sr: number,
-    winLen: number,
-    audioSamples?: number[],
-    hopLen?: number,
-  ) {
-    super(sr, winLen, audioSamples, hopLen);
-  }
+  // constructor(
+  //   sr: number,
+  //   winLen: number,
+  //   audioSamples?: number[],
+  //   hopLen?: number,
+  // ) {
+  //   super(sr, winLen, audioSamples, hopLen);
+  // }
 
   private ensureHanningWindow() {
     if (this.hanningWindow) return;
