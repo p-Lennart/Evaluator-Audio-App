@@ -19,6 +19,7 @@ export default function ScoreDisplay({
   const webviewRef = useRef<WebView>(null);  // Native-only ref (Used to inject html code into since OSMD is only supported through browser)
   const [steps, setSteps] = useState<string>(""); // state for declaring number of intended cursor iterations
   const [speed, setSpeed] = useState<string>(""); // state solely used for testing cursor movement logic using the commented out code for input in the return below
+  const [pitch, setPitch] = useState<string>(""); // state for declaring number of intended cursor iterations
   const movedBeats = useRef<number>(0); // ref to store current beat position (used ref instead of state to prevent multiple refreshes)
   const animRef = useRef<number | null>(null);; // ref to store current animation id 
   const overshootBeats = useRef<number>(0); // How much beat value have we gone over by when going to next note and adding it's beat value (can ignore this - variable probably always 0 due to new implementation of movement logic)
@@ -88,7 +89,7 @@ export default function ScoreDisplay({
       let delta = advanceToNextBeat( // Move cursor to next note and return the beat value of that next note
         cursorRef.current!,
         osdRef.current!.Sheet.Instruments,
-        denom
+        denom,
       );
 
       moved += delta; // Accumulate the moved beats
@@ -100,17 +101,40 @@ export default function ScoreDisplay({
     stepFn(); // Start the step loop
   };
 
+  // Cursor movement effect
   useEffect(() => {
     const beat = state.estimatedBeat; // Get beat from global state
     if (typeof beat !== "number") return; // Only proceed if beat is valid
     setSteps(String(beat)); // Update step state (beat value we are trying to move the cursor to)
   }, [state.estimatedBeat]); // Queue when global beat value changes
 
+  // Chained cursor movement effect
   useEffect(() => {
     if (steps === "") return; // Chained useeffect to have steps state updated properly before running the cursor movement logic
     moveCursorByBeats(); // Cursor movement using the latest step 
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 
+  // Note coloring effect 
+  useEffect(() => {
+    if (typeof state.estimatedPitch !== "number") return;
+    if (!osdRef.current || !cursorRef.current) return;
+    
+    const instruments = osdRef.current.Sheet.Instruments;
+    const voices = cursorRef.current.VoicesUnderCursor(instruments[0]);
+    if (voices.length && voices[0].Notes.length) {
+      const note = voices[0].Notes[0];
+      
+      console.log("Coloring by estimated pitch: ", state.estimatedPitch);
+      if (state.estimatedPitch < 0) {
+        note.NoteheadColor = "#FF0000";
+      } else if (state.estimatedPitch > 0) {
+        note.NoteheadColor = "#00FF00";
+      } else {
+        note.NoteheadColor = "#000000";
+      }
+      osdRef.current.render(); // refresh sheet with coloring applied
+    }
+  }, [state.estimatedBeat, state.estimatedPitch]);
 
   // Web-only initialization
   useEffect(() => {

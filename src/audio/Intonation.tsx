@@ -117,6 +117,7 @@ function estimatePitchesAtTimestamps(
         });
 
         diffAggregate = diffAggregate.filter(element => element !== undefined);
+        const intonationDiff = listMedian(diffAggregate);
         const pitchEstimate = scorePitch + listMedian(diffAggregate);
 
         if (logging) {
@@ -126,7 +127,8 @@ function estimatePitchesAtTimestamps(
             console.log(`Score Pitch: `, scorePitch);
         }
 
-        return pitchEstimate;
+        return intonationDiff;
+        // return pitchEstimate;
     });
 
     return pitchEstimates;

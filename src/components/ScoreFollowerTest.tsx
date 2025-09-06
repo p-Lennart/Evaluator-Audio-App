@@ -172,6 +172,22 @@ export default function ScoreFollowerTest({
           predictedTime: predictedTimes[i],
         }));
 
+        const scorePitchesCol = csvDataRef.current.map(r => r.midi);
+        const intonationParams = [1024, 512];
+        const intonation = calculateIntonation(
+            audioData,
+            scorePitchesCol,
+            refTimes,
+            sr,
+            intonationParams[0],
+             intonationParams[1],
+        );
+  
+        // Update CSV struct arr with intonation values for each note 
+        csvDataRef.current = csvDataRef.current.map((row, i) => ({
+          ...row,
+          intonation: intonation[i],
+        }));
       }
 
       console.log(pathRef.current) // Show full path
@@ -186,7 +202,9 @@ export default function ScoreFollowerTest({
           currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
+          const pitch = csvDataRef.current[nextIndexRef.current].intonation // Get beat of that note
           dispatch({ type: 'SET_ESTIMATED_BEAT', payload: beat }); // Update beat to move cursor
+          dispatch({ type: 'SET_ESTIMATED_PITCH', payload: pitch });
           nextIndexRef.current++; // Go to next row of csv 
         }
 
