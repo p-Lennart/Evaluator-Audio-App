@@ -1,9 +1,23 @@
-import { ScrollView, StyleSheet, Text, View, Platform, useWindowDimensions, ActivityIndicator} from "react-native";
-import React, { useRef, useEffect, useState} from "react";
-import { Cursor, OpenSheetMusicDisplay} from "opensheetmusicdisplay";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Platform,
+  useWindowDimensions,
+  ActivityIndicator,
+} from "react-native";
+import React, { useRef, useEffect, useState } from "react";
+import { Cursor, OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import scoresData from "../score_name_to_data_map/scoreToMusicxmlMap"; // Local mapping of score filenames to XML content
 import { WebView } from "react-native-webview";
-import { advanceToNextBeat, buildOsmdHtmlForNative, initOsmdWeb, onHandleOsmdMessageForNative, peekAtCurrentBeat } from "../utils/osmdUtils"; // Helper functions used to manipulate the OSMD Display 
+import {
+  advanceToNextBeat,
+  buildOsmdHtmlForNative,
+  initOsmdWeb,
+  onHandleOsmdMessageForNative,
+  peekAtCurrentBeat,
+} from "../utils/osmdUtils"; // Helper functions used to manipulate the OSMD Display
 
 export default function ScoreDisplay({
   state,
@@ -12,25 +26,22 @@ export default function ScoreDisplay({
   state: any;
   dispatch: any;
 }) {
-  
   const osmContainerRef = useRef<HTMLDivElement | null>(null); // Reference for the SVG container (Web reference to container)
-  const cursorRef = useRef<Cursor | null>(null);  // Create reference to the OSMD cursor 
+  const cursorRef = useRef<Cursor | null>(null); // Create reference to the OSMD cursor
   const osdRef = useRef<OpenSheetMusicDisplay | null>(null); // Create ref to the OSMD object for web
-  const webviewRef = useRef<WebView>(null);  // Native-only ref (Used to inject html code into since OSMD is only supported through browser)
+  const webviewRef = useRef<WebView>(null); // Native-only ref (Used to inject html code into since OSMD is only supported through browser)
   const [steps, setSteps] = useState<string>(""); // state for declaring number of intended cursor iterations
   const [speed, setSpeed] = useState<string>(""); // state solely used for testing cursor movement logic using the commented out code for input in the return below
   const [pitch, setPitch] = useState<string>(""); // state for declaring number of intended cursor iterations
   const movedBeats = useRef<number>(0); // ref to store current beat position (used ref instead of state to prevent multiple refreshes)
-  const animRef = useRef<number | null>(null);; // ref to store current animation id 
+  const animRef = useRef<number | null>(null); // ref to store current animation id
   const overshootBeats = useRef<number>(0); // How much beat value have we gone over by when going to next note and adding it's beat value (can ignore this - variable probably always 0 due to new implementation of movement logic)
 
   // Determine if we need to update styles if screen is below a certain threshold
-  const { width, height } = useWindowDimensions()
+  const { width, height } = useWindowDimensions();
   const isSmallScreen = width < 960;
 
-
   const moveCursorByBeats = () => {
-
     const targetBeats = parseFloat(steps); // Beat value that we want the cursor to be at
 
     // Cancel any previous animation frame before starting a new one (good for concecutive rerenders)
@@ -39,9 +50,9 @@ export default function ScoreDisplay({
     }
 
     // MOBILE branch: send JS into the WebView to move the cursor (same logic as the web one, can be seen from buildOsmdHtmlForNative helper function)
-    if (Platform.OS !== 'web') { 
+    if (Platform.OS !== "web") {
       webviewRef.current?.injectJavaScript(
-        `window.stepCursor(${parseFloat(steps)}); true;`
+        `window.stepCursor(${parseFloat(steps)}); true;`,
       );
       return;
     }
@@ -52,20 +63,23 @@ export default function ScoreDisplay({
       return;
     }
     const measures = osdRef.current!.GraphicSheet.MeasureList; // Get the list of measures from the rendered music sheet
-    if (!measures.length || !measures[0].length) return;     // Exit if no measures are found
-
+    if (!measures.length || !measures[0].length) return; // Exit if no measures are found
 
     // Get the denominator of the current time signature (e.g., 4 for 4/4)
-    const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature!.denominator;
+    const denom =
+      measures[0][0].parentSourceMeasure.ActiveTimeSignature!.Denominator;
 
     // Get the voices currently under the cursor for the first instrument (only 1 instrument - Evaluator)
     let initialBeats = movedBeats.current;
     if (movedBeats.current === 0) {
-      initialBeats = peekAtCurrentBeat(cursorRef.current!, osdRef.current!.Sheet.Instruments, denom); // Intialbeats = beat value of the current note that the cursor is on
+      initialBeats = peekAtCurrentBeat(
+        cursorRef.current!,
+        osdRef.current!.Sheet.Instruments,
+        denom,
+      ); // Intialbeats = beat value of the current note that the cursor is on
     }
     movedBeats.current = initialBeats; // This is accounting for the first note that the cursor highlights at the beginning
-    console.log("movedBeats :", movedBeats)
-
+    console.log("movedBeats :", movedBeats);
 
     // Calculate how many beats we need to move forward
     const toMove = Math.max(0, targetBeats);
@@ -76,24 +90,24 @@ export default function ScoreDisplay({
 
     // Recursive function to advance the cursor step-by-step
     const stepFn = () => {
-
       // Stop if we've moved enough beats
       if (moved >= toMove) {
-        const leftover = moved - toMove
+        const leftover = moved - toMove;
         overshootBeats.current = leftover;
         movedBeats.current = toMove;
         osdRef.current!.render(); // Re-render the music sheet
         return;
       }
 
-      let delta = advanceToNextBeat( // Move cursor to next note and return the beat value of that next note
+      let delta = advanceToNextBeat(
+        // Move cursor to next note and return the beat value of that next note
         cursorRef.current!,
         osdRef.current!.Sheet.Instruments,
         denom,
       );
 
       moved += delta; // Accumulate the moved beats
-      movedBeats.current = moved; // Update reference 
+      movedBeats.current = moved; // Update reference
 
       osdRef.current!.render(); // Re-render to reflect the cursor's new position
       animRef.current = requestAnimationFrame(stepFn); // Schedule a new animation frame and store its ID (better alternative to setTimeout)
@@ -111,19 +125,19 @@ export default function ScoreDisplay({
   // Chained cursor movement effect
   useEffect(() => {
     if (steps === "") return; // Chained useeffect to have steps state updated properly before running the cursor movement logic
-    moveCursorByBeats(); // Cursor movement using the latest step 
+    moveCursorByBeats(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 
-  // Note coloring effect 
+  // Note coloring effect
   useEffect(() => {
     if (typeof state.estimatedPitch !== "number") return;
     if (!osdRef.current || !cursorRef.current) return;
-    
+
     const instruments = osdRef.current.Sheet.Instruments;
     const voices = cursorRef.current.VoicesUnderCursor(instruments[0]);
     if (voices.length && voices[0].Notes.length) {
       const note = voices[0].Notes[0];
-      
+
       console.log("Coloring by estimated pitch: ", state.estimatedPitch);
       if (state.estimatedPitch < 0) {
         note.NoteheadColor = "#FF0000";
@@ -138,10 +152,20 @@ export default function ScoreDisplay({
 
   // Web-only initialization
   useEffect(() => {
-    initOsmdWeb(osmContainerRef, osdRef, cursorRef, state, dispatch, isSmallScreen); // Initializes osdRef and cursorRef 
-  }, [dispatch, state.score, state.scores])
+    initOsmdWeb(
+      osmContainerRef,
+      osdRef,
+      cursorRef,
+      state,
+      dispatch,
+      isSmallScreen,
+    ); // Initializes osdRef and cursorRef
+  }, [dispatch, state.score, state.scores]);
 
-  const selectedXml = (state.scoreContents && state.scoreContents[state.score]) || scoresData[state.score] || ""; // Get selected xml data from given the current score's name
+  const selectedXml =
+    (state.scoreContents && state.scoreContents[state.score]) ||
+    scoresData[state.score] ||
+    ""; // Get selected xml data from given the current score's name
 
   return (
     <>
@@ -176,13 +200,14 @@ export default function ScoreDisplay({
         {Platform.OS === "web" ? (
           <div ref={osmContainerRef} style={styles.osmContainer} />
         ) : (
-
           // Otherwise use WebView component to render OSMD since it only has web base support so injecting html is the only way
           <WebView
             ref={webviewRef}
             originWhitelist={["*"]}
             source={{ html: buildOsmdHtmlForNative(selectedXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
-            onMessage={e => onHandleOsmdMessageForNative(e.nativeEvent.data, dispatch)} // Call function when page inside this Webview calls postMessage
+            onMessage={(e) =>
+              onHandleOsmdMessageForNative(e.nativeEvent.data, dispatch)
+            } // Call function when page inside this Webview calls postMessage
             style={{ backgroundColor: "transparent", height: 400 }}
           />
         )}
@@ -213,7 +238,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 20,
     textAlign: "center",
-    color: "#2C3E50"
+    color: "#2C3E50",
   },
 
   // Below styles used to have a loading indicator on the top of the OSMD display
@@ -236,6 +261,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 16,
     color: "#333",
-    fontWeight: 700
-  }
+    fontWeight: 700,
+  },
 });

@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Button, ScrollView, Platform } from 'react-native';
-import RNPickerSelect from 'react-native-picker-select';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
-import { decode as atob } from 'base-64';
-import { Midi } from '@tonejs/midi';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Button,
+  ScrollView,
+  Platform,
+} from "react-native";
+import RNPickerSelect from "react-native-picker-select";
+import { Asset } from "expo-asset";
+import * as FileSystem from "expo-file-system";
+import { decode as atob } from "base-64";
+import { Midi } from "@tonejs/midi";
 
 const midiFiles = {
-  'ode_to_joy_baseline': require('../../assets/midi/ode_to_joy_baseline.mid'),
-  'performance.mid': require('../../assets/midi/performance.mid'),
-  'performance1.mid': require('../../assets/midi/performance1.mid'),
-  'performance2.mid': require('../../assets/midi/performance2.mid'),
+  ode_to_joy_baseline: require("../../assets/midi/ode_to_joy_baseline.mid"),
+  "performance.mid": require("../../assets/midi/performance.mid"),
+  "performance1.mid": require("../../assets/midi/performance1.mid"),
+  "performance2.mid": require("../../assets/midi/performance2.mid"),
 } as const;
 
 type MidiFileKey = keyof typeof midiFiles;
@@ -18,7 +25,7 @@ type MidiFileKey = keyof typeof midiFiles;
 export function MissingExtraIndicator() {
   const [refFile, setRefFile] = useState<MidiFileKey | null>(null);
   const [perfFile, setPerfFile] = useState<MidiFileKey | null>(null);
-  const [result, setResult] = useState('');
+  const [result, setResult] = useState("");
 
   // Extract pitch count from MIDI
   const extractNoteCounts = (midi: Midi): Record<string, number> => {
@@ -36,9 +43,12 @@ export function MissingExtraIndicator() {
   // Compare pitch counts
   const compareNoteCounts = (
     refCounts: Record<string, number>,
-    perfCounts: Record<string, number>
+    perfCounts: Record<string, number>,
   ) => {
-    const allPitches = new Set([...Object.keys(refCounts), ...Object.keys(perfCounts)]);
+    const allPitches = new Set([
+      ...Object.keys(refCounts),
+      ...Object.keys(perfCounts),
+    ]);
     const missing: string[] = [];
     const extra: string[] = [];
 
@@ -61,7 +71,7 @@ export function MissingExtraIndicator() {
     await asset.downloadAsync();
     const uri = asset.localUri || asset.uri;
 
-    if (Platform.OS === 'web') {
+    if (Platform.OS === "web") {
       const response = await fetch(uri);
       const arrayBuffer = await response.arrayBuffer();
       return new Midi(new Uint8Array(arrayBuffer));
@@ -80,7 +90,7 @@ export function MissingExtraIndicator() {
 
   const handleCompare = async () => {
     if (!refFile || !perfFile) {
-      setResult('Please select both reference and performance files.');
+      setResult("Please select both reference and performance files.");
       return;
     }
 
@@ -94,12 +104,12 @@ export function MissingExtraIndicator() {
       const { missing, extra } = compareNoteCounts(refCounts, perfCounts);
 
       setResult(
-        `Missing Notes:\n${missing.length ? missing.join('\n') : 'None'}\n\n` +
-        `Extra Notes:\n${extra.length ? extra.join('\n') : 'None'}`
+        `Missing Notes:\n${missing.length ? missing.join("\n") : "None"}\n\n` +
+          `Extra Notes:\n${extra.length ? extra.join("\n") : "None"}`,
       );
     } catch (err) {
       console.error(err);
-      setResult('Error reading MIDI files.');
+      setResult("Error reading MIDI files.");
     }
   };
 
@@ -114,13 +124,13 @@ export function MissingExtraIndicator() {
       <RNPickerSelect
         onValueChange={(val) => setRefFile(val as MidiFileKey)}
         items={fileOptions}
-        placeholder={{ label: 'Select Reference MIDI', value: null }}
+        placeholder={{ label: "Select Reference MIDI", value: null }}
       />
       <Text style={styles.label}>Performance File</Text>
       <RNPickerSelect
         onValueChange={(val) => setPerfFile(val as MidiFileKey)}
         items={fileOptions}
-        placeholder={{ label: 'Select Performance MIDI', value: null }}
+        placeholder={{ label: "Select Performance MIDI", value: null }}
       />
       <Button title="Compare MIDI Files" onPress={handleCompare} />
       <ScrollView style={styles.scrollResult}>
@@ -134,13 +144,13 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 20,
     padding: 10,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderWidth: 1,
     borderRadius: 10,
   },
   label: {
     marginTop: 10,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   scrollResult: {
     marginTop: 20,
@@ -148,6 +158,5 @@ const styles = StyleSheet.create({
   },
   result: {
     fontSize: 16,
-    whiteSpace: 'pre-line',
   },
 });

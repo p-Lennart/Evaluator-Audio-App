@@ -1,15 +1,29 @@
 // Import necessary modules and components from the Expo and React Native libraries
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, useWindowDimensions, ScrollView, Animated, Platform } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  SafeAreaView,
+  TouchableOpacity,
+  useWindowDimensions,
+  ScrollView,
+  Animated,
+  Platform,
+} from "react-native";
 import React, { useEffect, useReducer, useRef, useState } from "react";
 import { Score_Select } from "./src/components/ScoreSelect";
 import reducer_function from "./src/store/Dispatch";
 import ScoreDisplay from "./src/components/ScoreDisplay";
-import Icon from 'react-native-vector-icons/Feather';
+import Icon from "react-native-vector-icons/Feather";
 import { CENSFeatures } from "./src/audio/FeaturesCENS";
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import { ExpoMicProcessor } from './src/audio/ExpoMicProcessor';
+import FontAwesome from "react-native-vector-icons/FontAwesome";
+import { ExpoMicProcessor } from "./src/audio/ExpoMicProcessor";
 import ScoreFollowerTest from "./src/components/ScoreFollowerTest";
-import { initNativeAudio, initWebAudio, stopLiveAudio } from "./src/utils/liveMicUtils";
+import {
+  initNativeAudio,
+  initWebAudio,
+  stopLiveAudio,
+} from "./src/utils/liveMicUtils";
 import { useThemeAnimations } from "./src/utils/themeUtils";
 
 // Define the main application component
@@ -27,7 +41,7 @@ export default function App() {
   const [state, dispatch] = useReducer(
     reducer_function, // The reducer function is found in /store/Dispatch.ts
     {
-      playing: false, // Whether the audio is playing 
+      playing: false, // Whether the audio is playing
       score: "", // The score name we are currently on (followed with .musicxml)
       accompanimentSound: null, // The accompaniment sound (no applicable in evalautor project but here just in case )
       tempo: null, // The tempo of the current score  (extracted from musicxml file using helper function "extractTempo()")
@@ -37,7 +51,7 @@ export default function App() {
       estimatedPitch: null as number | null,
       bottomAudioUri: null as string | null, // Playback audio uri (for when there is two instruments - ref audio uri to bottom one, only applicable in Companion Project)
       beatsPerMeasure: 0, // Numerator of time signature used to compute values for the tempo by measure graph (TempoGraph.tsx)
-      loadingPerformance: false // Boolean indicator to let other components know if we are currently loading a performance or not to enable or disable certain functions
+      loadingPerformance: false, // Boolean indicator to let other components know if we are currently loading a performance or not to enable or disable certain functions
     },
   );
 
@@ -45,10 +59,10 @@ export default function App() {
   const [started, setStarted] = useState(false); // State used to determine user toggled the live microphone option or not
 
   const processor = useRef(new ExpoMicProcessor()).current; // Create a stable ExpoMicProcessor instance
-  const SAMPLE_RATE = 44100;  // Define sample rate for ChromaMaker
+  const SAMPLE_RATE = 44100; // Define sample rate for ChromaMaker
   const N_FFT = 4096; // Define chunk size for ChromaMaker
-  const chromaMaker = useRef(new CENSFeatures(SAMPLE_RATE, N_FFT)).current; // Create a stable ChromaMaker instance 
-  
+  const chromaMaker = useRef(new CENSFeatures(SAMPLE_RATE, N_FFT)).current; // Create a stable ChromaMaker instance
+
   // Initialize mic to capture live audio when "started" state changes (on mic icon click)
   useEffect(() => {
     if (started) {
@@ -78,78 +92,126 @@ export default function App() {
     toggleTheme, // Function used to switch themes
   } = useThemeAnimations(); // Helper function useThemeAnimations() used to obtain dynamic styles (containerBackgroundColor, textColor, etc...) based on theme variable
 
-  const { width, height } = useWindowDimensions() // Get device's width 
-  const isSmallScreen = width < 960;  // Boolean used for dynmaic display (row or column)
-
+  const { width, height } = useWindowDimensions(); // Get device's width
+  const isSmallScreen = width < 960; // Boolean used for dynmaic display (row or column)
 
   ////////////////////////////////////////////////////////////////////////////////
   // Render the component's UI
   ////////////////////////////////////////////////////////////////////////////////
   return (
-
     // BG Color for iphone padding - no padding if on landscape mode (top and bottom)
-    <SafeAreaView style={[styles.container, {backgroundColor: width < height? '#2C3E50': ""}]} >
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: width < height ? "#2C3E50" : "" },
+      ]}
+    >
       {/* Account for top padding on Iphone */}
-      <SafeAreaView > 
+      <SafeAreaView>
         {/* Header with image */}
-        <Animated.View style={[styles.menu_bar, {backgroundColor: '#2C3E50', height: isSmallScreen? 40: 80}, { position: 'relative', top: 0 }]}>
-        <Text
+        <Animated.View
           style={[
-            styles.logoText,
-            { fontSize: isSmallScreen ? 18 : 32 },
+            styles.menu_bar,
+            { backgroundColor: "#2C3E50", height: isSmallScreen ? 40 : 80 },
+            { position: "relative", top: 0 },
           ]}
         >
-          Evaluator
-        </Text>          
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text
+            style={[styles.logoText, { fontSize: isSmallScreen ? 18 : 32 }]}
+          >
+            Evaluator
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             {/* Light & Dark Mode is disabled for now - due to not looking too good after adding more stuff */}
-            <TouchableOpacity disabled={true} onPress={() => setStarted(!started)}> 
+            <TouchableOpacity
+              disabled={true}
+              onPress={() => setStarted(!started)}
+            >
               <FontAwesome
-                name={started ? 'microphone' : 'microphone-slash'}
+                name={started ? "microphone" : "microphone-slash"}
                 size={isSmallScreen ? 15 : 30}
                 color="grey"
               />
             </TouchableOpacity>
             {/* Live mic is work in progress with online dtw - also disabled */}
-            <TouchableOpacity disabled={true} onPress={toggleTheme}> 
-              <Icon name={theme === 'light' ? 'sun' : 'moon'} size={isSmallScreen? 15: 30}  color="grey" />
+            <TouchableOpacity disabled={true} onPress={toggleTheme}>
+              <Icon
+                name={theme === "light" ? "sun" : "moon"}
+                size={isSmallScreen ? 15 : 30}
+                color="grey"
+              />
             </TouchableOpacity>
           </View>
         </Animated.View>
       </SafeAreaView>
 
-        {/* Provides safe area insets for mobile devices */}
-        <Animated.View style={[styles.container, { backgroundColor: containerBackgroundColor }]}>
-
-          {/* Scroll View used for device scroll for content going over the frame */}
-          <ScrollView contentContainerStyle={isSmallScreen ? { flexGrow: 1 } : {height: "100%"}}>
-
+      {/* Provides safe area insets for mobile devices */}
+      <Animated.View
+        style={[
+          styles.container,
+          { backgroundColor: containerBackgroundColor },
+        ]}
+      >
+        {/* Scroll View used for device scroll for content going over the frame */}
+        <ScrollView
+          contentContainerStyle={
+            isSmallScreen ? { flexGrow: 1 } : { height: "100%" }
+          }
+        >
           {/* Container used for 1:3 ratio display */}
-          <View style={[styles.contentWrapper, isSmallScreen ? styles.contentWrapperColumn : styles.contentWrapperRow]}>
-
+          <View
+            style={[
+              styles.contentWrapper,
+              isSmallScreen
+                ? styles.contentWrapperColumn
+                : styles.contentWrapperRow,
+            ]}
+          >
             {/* Sidebar for inputs and buttons (takes up little width) */}
-            <Animated.View style={[styles.sidebar, { backgroundColor: sidebarBackgroundColor }, isSmallScreen ? styles.sidebarColumn : {}]}>
-               {/* UI of rendering the list of scores for the user to select - show when not in play mode */}
-               <Score_Select state={state} dispatch={dispatch} textStyle={textColor} borderStyle={borderBottomColor} button_text_style={invertTextColor} button_format={[styles.button, {backgroundColor: buttonBackgroundColor}]}/> 
-              
+            <Animated.View
+              style={[
+                styles.sidebar,
+                { backgroundColor: sidebarBackgroundColor },
+                isSmallScreen ? styles.sidebarColumn : {},
+              ]}
+            >
+              {/* UI of rendering the list of scores for the user to select - show when not in play mode */}
+              <Score_Select
+                state={state}
+                dispatch={dispatch}
+                textStyle={textColor}
+                borderStyle={borderBottomColor}
+                button_text_style={invertTextColor}
+                button_format={[
+                  styles.button,
+                  { backgroundColor: buttonBackgroundColor },
+                ]}
+              />
+
               {/* Start button to play performance */}
-              <ScoreFollowerTest 
+              <ScoreFollowerTest
                 score={state.score}
                 dispatch={dispatch}
                 bpm={state.tempo}
                 state={state}
               />
             </Animated.View>
-            
+
             {/* Scroll View used for horizontal scolling */}
             <ScrollView
-              horizontal={false} 
-              showsHorizontalScrollIndicator={false} 
+              horizontal={false}
+              showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ flexGrow: 1 }} // Ensure the content fills the container
             >
               {/* Actual score sheet display (takes up remaining width after sidebar) */}
-              <Animated.View style={[styles.mainContent, {backgroundColor: mainContentBackgroundColor}, isSmallScreen ? styles.mainContentColumn : {}]}>
-                <ScoreDisplay state={state} dispatch={dispatch}/>
+              <Animated.View
+                style={[
+                  styles.mainContent,
+                  { backgroundColor: mainContentBackgroundColor },
+                  isSmallScreen ? styles.mainContentColumn : {},
+                ]}
+              >
+                <ScoreDisplay state={state} dispatch={dispatch} />
               </Animated.View>
             </ScrollView>
           </View>
@@ -161,13 +223,12 @@ export default function App() {
 
 // Define styles for the components using StyleSheet
 const styles = StyleSheet.create({
-
   // Main container for entire content
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
   },
-  // Header container 
+  // Header container
   menu_bar: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -180,7 +241,7 @@ const styles = StyleSheet.create({
     position: "absolute", // make header stick on top even after scroll
     top: 0,
     width: "100%",
-    zIndex: 99
+    zIndex: 99,
   },
   // Image for header
   logo: {
@@ -193,7 +254,7 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
     padding: 20,
-    marginTop: 10 // account for fixed header
+    marginTop: 10, // account for fixed header
   },
   // Container displaying sidebar and main content (row form)
   contentWrapperRow: {
@@ -215,14 +276,14 @@ const styles = StyleSheet.create({
       width: 0,
       height: 3,
     },
-    shadowOpacity:  0.17,
+    shadowOpacity: 0.17,
     shadowRadius: 3.05,
     elevation: 4,
   },
   sidebarColumn: {
     width: "100%", // Full width on smaller screens
   },
-  // Container displaying score sheet 
+  // Container displaying score sheet
   mainContent: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -234,7 +295,7 @@ const styles = StyleSheet.create({
       width: 0,
       height: 3,
     },
-    shadowOpacity:  0.17,
+    shadowOpacity: 0.17,
     shadowRadius: 3.05,
     elevation: 4,
   },
@@ -253,7 +314,7 @@ const styles = StyleSheet.create({
       width: 0,
       height: 3,
     },
-    shadowOpacity:  0.17,
+    shadowOpacity: 0.17,
     shadowRadius: 3.05,
     elevation: 4,
   },
@@ -265,8 +326,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   logoText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
+    color: "white",
+    fontWeight: "bold",
+    textTransform: "uppercase",
   },
 });
