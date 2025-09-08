@@ -20,12 +20,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { endTimer, startTimer } from "../utils/Profiler";
 import { Features } from "./Features";
 
 function argmin(arr: number[]): number {
   return arr.reduce(
     (minIdx, val, idx, a) => (val < a[minIdx] ? idx : minIdx),
-    0,
+    0
   );
 }
 
@@ -48,13 +49,13 @@ export default class OnlineTimeWarping {
     ref: Features<unknown>,
     bigC: number,
     maxRunCount: number,
-    diagWeight: number,
+    diagWeight: number
   ) {
     this.ref = ref;
     this.refLen = ref.count;
     this.live = ref.cloneEmpty();
     this.accumulatedCost = Array.from({ length: this.refLen }, () =>
-      new Array(this.refLen * 4).fill(Infinity),
+      new Array(this.refLen * 4).fill(Infinity)
     );
 
     this.winSize = bigC;
@@ -77,8 +78,11 @@ export default class OnlineTimeWarping {
    */
   insert(audioFrame: number[]): number {
     this.liveIdx += 1;
+    startTimer("(4a) Live feature encoding");
     this.live.insert(audioFrame);
+    endTimer("(4a) Live feature encoding");
 
+    startTimer("(4b) Cost computation");
     for (
       let k = Math.max(0, this.refIdx - this.winSize + 1);
       k <= this.refIdx;
@@ -86,6 +90,7 @@ export default class OnlineTimeWarping {
     ) {
       this._update_accumulated_cost(k, this.liveIdx);
     }
+    endTimer("(4b) Cost computation");
 
     const path: [number, number][] = [];
 
@@ -126,7 +131,7 @@ export default class OnlineTimeWarping {
   private _get_best_step(): [string, [number, number]] {
     const row_costs = this.accumulatedCost[this.refIdx].slice(
       0,
-      this.liveIdx + 1,
+      this.liveIdx + 1
     );
     const col_costs = this.accumulatedCost
       .map((row) => row[this.liveIdx])
@@ -190,7 +195,7 @@ export default class OnlineTimeWarping {
 
     if (refIdx > 0 && liveIdx > 0) {
       steps.push(
-        this.accumulatedCost[refIdx - 1][liveIdx - 1] + this.diagWeight * cost,
+        this.accumulatedCost[refIdx - 1][liveIdx - 1] + this.diagWeight * cost
       );
     }
     if (refIdx > 0) {

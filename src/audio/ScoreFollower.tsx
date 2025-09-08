@@ -1,6 +1,7 @@
 import { resampleAudio, toMono } from "../utils/audioUtils";
 import { Features, FeaturesConstructor } from "./Features";
 import OnlineTimeWarping from "./OnlineTimeWarping";
+import { startTimer, endTimer } from "../utils/Profiler";
 
 const wav = require("node-wav");
 
@@ -21,7 +22,7 @@ export class ScoreFollower {
   private constructor(
     FeaturesClass: FeaturesConstructor<any>,
     sr: number,
-    winLen: number,
+    winLen: number
   ) {
     this.FeaturesClass = FeaturesClass;
     this.sr = sr;
@@ -39,6 +40,7 @@ export class ScoreFollower {
    * @param winLen Number of frames per feature (default 4096)
    * @param hopLen Number of samples between frames (default winLen)
    */
+
   static async create(
     refUri: string,
     FeaturesClass: FeaturesConstructor<any>,
@@ -47,28 +49,31 @@ export class ScoreFollower {
     diagWeight = 0.75,
     sr = 44100,
     winLen = 4096,
-    hopLen = winLen,
+    hopLen = winLen
   ) {
+    startTimer("(1) Loading reference audio");
     const instance = new ScoreFollower(FeaturesClass, sr, winLen);
+
     instance.ref = await instance.loadRefFromAudio(
       refUri,
       FeaturesClass,
       sr,
       winLen,
-      hopLen,
+      hopLen
     );
+    endTimer("(1) Loading reference audio");
     console.log(
       "-- Reference loaded — initializing OTW with bigC=",
       bigC,
       "maxRunCount=",
-      maxRunCount,
+      maxRunCount
     );
 
     instance.otw = new OnlineTimeWarping(
       instance.ref,
       bigC,
       maxRunCount,
-      diagWeight,
+      diagWeight
     );
     console.log("ScoreFollower.create(): done");
 
@@ -96,7 +101,7 @@ export class ScoreFollower {
     FeaturesClass: FeaturesConstructor<any>,
     sr: number,
     winLen: number,
-    hopLen: number = winLen,
+    hopLen: number = winLen
   ) {
     console.log("ScoreFollower.loadRefFromAudio(): fetching", refUri);
 
@@ -104,7 +109,7 @@ export class ScoreFollower {
     const res = await fetch(refUri);
     if (!res.ok) {
       throw new Error(
-        `Failed to fetch ${refUri}: ${res.status} ${res.statusText}`,
+        `Failed to fetch ${refUri}: ${res.status} ${res.statusText}`
       );
     }
 
@@ -119,7 +124,7 @@ export class ScoreFollower {
       "-- Decoded channels=",
       result.channelData.length,
       "origSR=",
-      result.sampleRate,
+      result.sampleRate
     );
     console.log("-- Converting to mono…");
 
@@ -132,10 +137,10 @@ export class ScoreFollower {
     console.log("-- Resampled data length=", audioData.length);
 
     console.log("-- Building featuregram…");
-
+    startTimer("(2) Building ref featuregram");
     const features = new FeaturesClass(sr, winLen, audioData, hopLen);
     console.log("-- Featuregram length=", features.featuregram.length);
-
+    endTimer("(2) Building ref featuregram");
     return features;
   }
 
@@ -180,7 +185,7 @@ export class ScoreFollower {
    */
   getPathDifference(backPath: [number, number][]): [number, number][] {
     return this.path.filter(
-      ([r, l]) => !backPath.some(([br, bl]) => br === r && bl === l),
+      ([r, l]) => !backPath.some(([br, bl]) => br === r && bl === l)
     );
   }
 }

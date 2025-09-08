@@ -44,6 +44,7 @@ import {
 import { loadCsvInfo } from "../utils/csvParsingUtils";
 import { refAssetMap } from "../score_name_to_data_map/scoreToCsvMap";
 import { csvAssetMap } from "../score_name_to_data_map/scoreToWavMap";
+import { startTimer, endTimer } from "../utils/Profiler";
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
@@ -146,17 +147,21 @@ export default function ScoreFollowerTest({
         "-- Decoded: channels=",
         result.channelData.length,
         "origSR=",
-        result.sampleRate,
+        result.sampleRate
       );
 
+      startTimer("(3) Preparing live audio data");
       let audioData = toMono(result.channelData); // Convert these PCM audio data to mono if needed
       audioData = resampleAudio(audioData, result.sampleRate, sampleRate); // Resample the resulting audio data if needed
       audioDataRef.current = audioData;
       console.log("-- Audio data prepared, length=", audioData.length);
+      endTimer("(3) Preparing live audio data");
 
+      startTimer("(4) Computing alignment path");
       console.log("-- Computing alignment path...");
       pathRef.current = precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
       console.log("-- Alignment path length=", pathRef.current.length);
+      endTimer("(4) Computing alignment path");
 
       // const rawPath = computeOfflineAlignmentPath(refFeatures, audioDataRef.current, FeaturesCls, sr, winLen)
       // console.log("raw path: ", rawPath) // Just print to console log for now
@@ -184,7 +189,7 @@ export default function ScoreFollowerTest({
           // Obtain array of ESTIMATED timestamps of when each note is played in the live audio
           warpingPath,
           stepSize,
-          refTimes,
+          refTimes
         );
 
         // Update CSV Interface with predicted live times for each note
@@ -233,7 +238,7 @@ export default function ScoreFollowerTest({
           shouldPlay: true, // Automatically start playback once loaded
           progressUpdateIntervalMillis: 20, // Set how often status updates are triggered
         },
-        onPlaybackStatusUpdate, // Callback to handle playback progress (frame processing, alignment, etc.)
+        onPlaybackStatusUpdate // Callback to handle playback progress (frame processing, alignment, etc.)
       );
       soundRef.current = sound;
     } catch (err) {
