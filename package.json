@@ -33,6 +33,7 @@
     "memoize-one": "^6.0.0",
     "node-wav": "^0.0.2",
     "opensheetmusicdisplay": "^1.8.9",
+    "pitchy": "^4.1.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.1",

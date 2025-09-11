@@ -1,8 +1,6 @@
-import { resampleAudio, toMono } from "../utils/audioUtils";
 import { Features, FeaturesConstructor } from "./Features";
 import OnlineTimeWarping from "./OnlineTimeWarping";
-
-const wav = require("node-wav");
+import { prepareAudio } from "../utils/audioUtils";
 
 /**
  * Performs online dynamic time warping (DTW) between reference audio and live microphone audio.
@@ -100,36 +98,7 @@ export class ScoreFollower {
   ) {
     console.log("ScoreFollower.loadRefFromAudio(): fetching", refUri);
 
-    // Fetch the WAV file as ArrayBuffer
-    const res = await fetch(refUri);
-    if (!res.ok) {
-      throw new Error(
-        `Failed to fetch ${refUri}: ${res.status} ${res.statusText}`,
-      );
-    }
-
-    const arrayBuffer = await res.arrayBuffer();
-
-    console.log("-- Fetched buffer byteLength=", arrayBuffer.byteLength);
-
-    console.log("-- Decoding WAV…");
-    // Decode WAV buffer
-    const result = wav.decode(arrayBuffer);
-    console.log(
-      "-- Decoded channels=",
-      result.channelData.length,
-      "origSR=",
-      result.sampleRate,
-    );
-    console.log("-- Converting to mono…");
-
-    // Convert to Mono if needed
-    let audioData = toMono(result.channelData);
-    console.log(`-- Resampling from ${result.sampleRate} → ${sr}…`);
-
-    // Resample if needed
-    audioData = resampleAudio(audioData, result.sampleRate, sr);
-    console.log("-- Resampled data length=", audioData.length);
+    const audioData = await prepareAudio(refUri, sr);
 
     console.log("-- Building featuregram…");
 

@@ -77,6 +77,13 @@ const reducer_function = (state: any, action: any) => {
         estimatedBeat: action.payload as number,
       };
 
+    case "SET_ESTIMATED_PITCH": // Keep the existing state and  update estimatedBeat variable
+      console.log("[reducer] Estimated pitch:", action.payload);
+      return {
+        ...state,
+        estimatedPitch: action.payload as number,
+      };
+
     case "change_bottom_audio": // Keep the existing state and update the URI for playback audio (second instrument - only used in Companion Project) audio
       return {
         ...state,
