@@ -1,11 +1,12 @@
 import { PitchDetector } from "pitchy";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import { prepareAudio } from "../utils/audioUtils";
+import { TranscribeFloat32 } from "./BasicPitchWrapper";
 
 const OCTAVE_OFF_THRESHOLD = 2;
 const SEMITONE_THRESHOLD = 2;
 
-const AGGREGATE_DIVISOR = 2;
+const AGGREGATE_DIVISOR = 1.1;
 const AGGREGATE_DEFAULT_SIZE = 10;
 
 function windowNumPerTs(
@@ -189,12 +190,16 @@ export function calculateIntonation(
   );
 }
 
-export async function testIntonation(
+export async function TestIntonation(
   audioUri: string,
   tableUri: string,
   sr: number = 44100,
 ) {
   const audioData = await prepareAudio(audioUri, sr);
+
+  const res = await TranscribeFloat32(audioData, sr);
+  console.log(res);
+
   const table: CSVRow[] = await loadCsvInfo(tableUri);
 
   const timeColname = "refTime"; // Assume csv treats input audio as ref

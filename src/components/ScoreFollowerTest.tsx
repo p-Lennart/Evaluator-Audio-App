@@ -45,7 +45,7 @@ import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import { refAssetMap } from "../score_name_to_data_map/scoreToCsvMap";
 import { csvAssetMap } from "../score_name_to_data_map/scoreToWavMap";
 
-import { calculateIntonation, testIntonation } from "../audio/Intonation";
+import { calculateIntonation, TestIntonation } from "../audio/Intonation";
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
@@ -101,10 +101,9 @@ export default function ScoreFollowerTest({
     // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
     // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
 
-    const audioUri = "/air_on_the_g_string/baseline/instrument_0.wav";
+    const audioUri = "/air_on_the_g_string/altered/aotgs_pitchy.wav";
     const csvUri = "/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv";
-
-    await testIntonation(audioUri, csvUri, 44100);
+    await TestIntonation(audioUri, csvUri, 44100);
   };
 
   const runFollower = async () => {
