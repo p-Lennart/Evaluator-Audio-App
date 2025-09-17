@@ -19,6 +19,38 @@ import {
   peekAtCurrentBeat,
 } from "../utils/osmdUtils"; // Helper functions used to manipulate the OSMD Display
 
+const WRONG_THRESHOLD = 0.1;
+
+function gammaCurve(x: number): string {
+  // Clamp x between 0 and 1
+  const clamped = Math.max(0, Math.min(1, x));
+
+  // Gamma < 1 makes low values more distinct
+  const gamma = 0.4;
+  const intensity = Math.pow(clamped, gamma);
+
+  // r, g, or b channel only, scaled to 255
+  const r = Math.round(255 * intensity);
+
+  // Convert to hex (always two digits)
+  const twoDigitHex = r.toString(16).padStart(2, "0");
+  return twoDigitHex;
+}
+
+function colorByIntonation(intonation: number): string {
+  if (Math.abs(intonation) < WRONG_THRESHOLD) {
+    return "#000000";
+  }
+
+  const twoDigitHex = gammaCurve(Math.abs(intonation));
+  
+  if (intonation > 0) {
+    return `#00${twoDigitHex}00`;
+  } else {
+    return `#${twoDigitHex}0000`;
+  }
+}
+
 export default function ScoreDisplay({
   state,
   dispatch,
@@ -139,13 +171,7 @@ export default function ScoreDisplay({
       const note = voices[0].Notes[0];
 
       console.log("Coloring by estimated pitch: ", state.estimatedPitch);
-      if (state.estimatedPitch < 0) {
-        note.NoteheadColor = "#FF0000";
-      } else if (state.estimatedPitch > 0) {
-        note.NoteheadColor = "#00FF00";
-      } else {
-        note.NoteheadColor = "#000000";
-      }
+      note.NoteheadColor = colorByIntonation(state.estimatedPitch);
       osdRef.current.render(); // refresh sheet with coloring applied
     }
   }, [state.estimatedBeat, state.estimatedPitch]);
