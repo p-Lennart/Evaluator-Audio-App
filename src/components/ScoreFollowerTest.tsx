@@ -182,22 +182,24 @@ export default function ScoreFollowerTest({
           predictedTime: predictedTimes[i],
         }));
 
-        const scorePitchesCol = csvDataRef.current.map((r) => r.midi);
-        const intonationParams = [1024, 512];
-        const intonation = calculateIntonation(
-          audioData,
-          scorePitchesCol,
-          predictedTimes,
-          sr,
-          intonationParams[0],
-          intonationParams[1],
-        );
+        console.log("New table", csvDataRef.current);
 
-        // Update CSV struct arr with intonation values for each note
-        csvDataRef.current = csvDataRef.current.map((row, i) => ({
-          ...row,
-          intonation: intonation[i],
-        }));
+        // const scorePitchesCol = csvDataRef.current.map((r) => r.midi);
+        // const intonationParams = [1024, 512];
+        // const intonation = calculateIntonation(
+        //   audioData,
+        //   scorePitchesCol,
+        //   predictedTimes,
+        //   sr,
+        //   intonationParams[0],
+        //   intonationParams[1],
+        // );
+
+        // // Update CSV struct arr with intonation values for each note
+        // csvDataRef.current = csvDataRef.current.map((row, i) => ({
+        //   ...row,
+        //   intonation: intonation[i],
+        // }));
       }
 
       console.log(pathRef.current); // Show full path
@@ -208,6 +210,9 @@ export default function ScoreFollowerTest({
         if (!status.isLoaded) return; // Exit early if sound isn't loaded
         const currentTimeSec = status.positionMillis / 1000; // Convert current playback time from milliseconds to seconds
 
+        console.log("Tick", currentTimeSec, nextIndexRef.current < csvDataRef.current.length, currentTimeSec >=
+            csvDataRef.current[nextIndexRef.current].predictedTime);
+
         while (
           // Process only if the frame is within bounds and we have passed a predicted time of current csv row
           nextIndexRef.current < csvDataRef.current.length &&
@@ -216,8 +221,9 @@ export default function ScoreFollowerTest({
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
           const pitch = csvDataRef.current[nextIndexRef.current].intonation; // Get beat of that note
+          console.log("Dispatching beat update", beat);
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
-          dispatch({ type: "SET_ESTIMATED_PITCH", payload: pitch });
+          // dispatch({ type: "SET_ESTIMATED_PITCH", payload: pitch });
           nextIndexRef.current++; // Go to next row of csv
         }
 

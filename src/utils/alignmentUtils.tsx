@@ -24,6 +24,7 @@ import { FeaturesConstructor } from "../audio/Features";
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { dot } from "../audio/FeaturesCENS";
 import DynamicTimeWarping from "dynamic-time-warping-ts";
+import { RefreshControl } from "react-native";
 
 /**
  * Given a DTW warping path and reference audio timestamps, compute estimated live audio timestamps.
@@ -74,11 +75,12 @@ export const calculateWarpedTimes = (
       leftIdx = rightIdx = idx;
     }
 
-    // If no interpolation needed, just take the point
-    if (leftIdx === rightIdx) {
-      warpedTimes.push(livePathTimes[leftIdx]);
-      continue;
-    }
+
+    // // If no interpolation needed, just take the point
+    // if (leftIdx === rightIdx) {
+    //   warpedTimes.push(livePathTimes[leftIdx]);
+    //   continue;
+    // }
 
     // Linear interpolation fraction along the ref‐path segment
     const queryRefOffset = queryTime - refPathTimes[leftIdx]; // ≥ 0
@@ -89,8 +91,22 @@ export const calculateWarpedTimes = (
     const liveMaxOffset = livePathTimes[rightIdx] - livePathTimes[leftIdx];
     const queryOffsetLive = liveMaxOffset * queryOffsetNorm;
 
+    
+    if (livePathTimes[leftIdx] + queryOffsetLive < warpedTimes.slice(-1)[0]) {
+      console.log("TIMES GOES BACKWARDS, INTERP", warpedTimes.slice(-3), livePathTimes[leftIdx] + queryOffsetLive);
+      console.log("Interp values", queryOffsetLive, liveMaxOffset, queryOffsetNorm);
+      console.log("Last few path steps", warpingPath.slice(leftIdx - 3, leftIdx+1),
+        refPathTimes.slice(leftIdx - 3, leftIdx+1),
+        livePathTimes.slice(leftIdx - 3, leftIdx+1));
+    }
     warpedTimes.push(livePathTimes[leftIdx] + queryOffsetLive);
+    
+    
+    console.log("Ref time" , queryTime, "was closest to index", leftIdx, "with diff", diffs[idx], " ->", warpedTimes[warpedTimes.length - 1]);
+
   }
+
+
 
   return warpedTimes;
 };
