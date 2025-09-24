@@ -174,6 +174,9 @@ export default function ScoreFollowerTest({
           warpingPath,
           stepSize,
           refTimes,
+          true,
+          false,
+          false, // Turn off perfect timestamps for normal operation
         );
 
         // Update CSV struct arr with predicted live times for each note
@@ -210,8 +213,13 @@ export default function ScoreFollowerTest({
         if (!status.isLoaded) return; // Exit early if sound isn't loaded
         const currentTimeSec = status.positionMillis / 1000; // Convert current playback time from milliseconds to seconds
 
-        console.log("Tick", currentTimeSec, nextIndexRef.current < csvDataRef.current.length, currentTimeSec >=
-            csvDataRef.current[nextIndexRef.current].predictedTime);
+        // Console logging for cursor dispatch analysis
+        if (nextIndexRef.current < csvDataRef.current.length) {
+          const nextNote = csvDataRef.current[nextIndexRef.current];
+          const timeDiff = currentTimeSec - nextNote.predictedTime;
+          const willDispatch = currentTimeSec >= nextNote.predictedTime;
+          console.log(`Dispatch Timing: Audio=${currentTimeSec.toFixed(3)}s, Predicted=${nextNote.predictedTime.toFixed(3)}s, Diff=${timeDiff.toFixed(3)}s, Beat=${nextNote.beat}`);
+        }
 
         while (
           // Process only if the frame is within bounds and we have passed a predicted time of current csv row
@@ -221,7 +229,8 @@ export default function ScoreFollowerTest({
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
           const pitch = csvDataRef.current[nextIndexRef.current].intonation; // Get beat of that note
-          console.log("Dispatching beat update", beat);
+          const actualDelay = currentTimeSec - csvDataRef.current[nextIndexRef.current].predictedTime;
+          console.log(`Cursor Dispatch: Beat ${beat} dispatched with ${(actualDelay * 1000).toFixed(1)}ms delay`);
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
           // dispatch({ type: "SET_ESTIMATED_PITCH", payload: pitch });
           nextIndexRef.current++; // Go to next row of csv
