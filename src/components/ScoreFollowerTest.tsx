@@ -45,7 +45,7 @@ import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import { refAssetMap } from "../score_name_to_data_map/scoreToCsvMap";
 import { csvAssetMap } from "../score_name_to_data_map/scoreToWavMap";
 
-import { calculateIntonation, testIntonation } from "../audio/Intonation";
+import { calculateIntonation, intonationToColors, testIntonation } from "../audio/Intonation";
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
@@ -192,12 +192,17 @@ export default function ScoreFollowerTest({
           intonationParams[0],
           intonationParams[1],
         );
+  
+        dispatch({
+          type: "SET_NOTE_COLORS",
+          payload: intonationToColors(intonation)
+        });
 
-        // Update CSV struct arr with intonation values for each note
-        csvDataRef.current = csvDataRef.current.map((row, i) => ({
-          ...row,
-          intonation: intonation[i],
-        }));
+        // // Update CSV struct arr with intonation values for each note
+        // csvDataRef.current = csvDataRef.current.map((row, i) => ({
+        //   ...row,
+        //   intonation: intonation[i],
+        // }));
       }
 
       console.log(pathRef.current); // Show full path

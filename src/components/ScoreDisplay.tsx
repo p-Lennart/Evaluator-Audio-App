@@ -18,6 +18,7 @@ import {
   onHandleOsmdMessageForNative,
   peekAtCurrentBeat,
 } from "../utils/osmdUtils"; // Helper functions used to manipulate the OSMD Display
+import { colorNotesInMusicXML } from "../utils/musicXmlUtils";
 
 export default function ScoreDisplay({
   state,
@@ -128,27 +129,27 @@ export default function ScoreDisplay({
     moveCursorByBeats(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 
-  // Note coloring effect
-  useEffect(() => {
-    if (typeof state.estimatedPitch !== "number") return;
-    if (!osdRef.current || !cursorRef.current) return;
+  // // Note coloring effect
+  // useEffect(() => {
+  //   if (typeof state.estimatedPitch !== "number") return;
+  //   if (!osdRef.current || !cursorRef.current) return;
 
-    const instruments = osdRef.current.Sheet.Instruments;
-    const voices = cursorRef.current.VoicesUnderCursor(instruments[0]);
-    if (voices.length && voices[0].Notes.length) {
-      const note = voices[0].Notes[0];
+  //   const instruments = osdRef.current.Sheet.Instruments;
+  //   const voices = cursorRef.current.VoicesUnderCursor(instruments[0]);
+  //   if (voices.length && voices[0].Notes.length) {
+  //     const note = voices[0].Notes[0];
 
-      console.log("Coloring by estimated pitch: ", state.estimatedPitch);
-      if (state.estimatedPitch < 0) {
-        note.NoteheadColor = "#FF0000";
-      } else if (state.estimatedPitch > 0) {
-        note.NoteheadColor = "#00FF00";
-      } else {
-        note.NoteheadColor = "#000000";
-      }
-      osdRef.current.render(); // refresh sheet with coloring applied
-    }
-  }, [state.estimatedBeat, state.estimatedPitch]);
+  //     console.log("Coloring by estimated pitch: ", state.estimatedPitch);
+  //     if (state.estimatedPitch < 0) {
+  //       note.NoteheadColor = "#FF0000";
+  //     } else if (state.estimatedPitch > 0) {
+  //       note.NoteheadColor = "#00FF00";
+  //     } else {
+  //       note.NoteheadColor = "#000000";
+  //     }
+  //     osdRef.current.render(); // refresh sheet with coloring applied
+  //   }
+  // }, [state.estimatedBeat, state.estimatedPitch]);
 
   // Web-only initialization
   useEffect(() => {
@@ -162,10 +163,27 @@ export default function ScoreDisplay({
     ); // Initializes osdRef and cursorRef
   }, [dispatch, state.score, state.scores]);
 
-  const selectedXml =
+
+  const baseXml =
     (state.scoreContents && state.scoreContents[state.score]) ||
     scoresData[state.score] ||
     ""; // Get selected xml data from given the current score's name
+
+  const derivedXml = colorNotesInMusicXML(baseXml, state.noteColors || []);
+  console.log("Base XML", baseXml);
+  console.log("Derived XML", derivedXml);
+
+  // Runtime refresh
+  useEffect(() => {
+    initOsmdWeb(
+      osmContainerRef,
+      osdRef,
+      cursorRef,
+      { ...state, scoreContents: { [state.score]: derivedXml } }, 
+      dispatch,
+      isSmallScreen
+    );
+}, [dispatch, state.score, state.scores, derivedXml]);
 
   return (
     <>
@@ -204,7 +222,7 @@ export default function ScoreDisplay({
           <WebView
             ref={webviewRef}
             originWhitelist={["*"]}
-            source={{ html: buildOsmdHtmlForNative(selectedXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
+            source={{ html: buildOsmdHtmlForNative(derivedXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
             onMessage={(e) =>
               onHandleOsmdMessageForNative(e.nativeEvent.data, dispatch)
             } // Call function when page inside this Webview calls postMessage

@@ -1,3 +1,5 @@
+import { NoteColor } from "../utils/musicXmlUtils";
+
 const reducer_function = (state: any, action: any) => {
   console.log("Dispatch received.");
   // Conventions vary, but this one is rather common - the action argument
@@ -82,6 +84,13 @@ const reducer_function = (state: any, action: any) => {
       return {
         ...state,
         estimatedPitch: action.payload as number,
+      };
+
+    case "SET_NOTE_COLORS":
+      console.log("[reducer] Note colors:", action.payload);
+      return {
+        ...state,
+        noteColors: action.payload as NoteColor[],
       };
 
     case "change_bottom_audio": // Keep the existing state and update the URI for playback audio (second instrument - only used in Companion Project) audio

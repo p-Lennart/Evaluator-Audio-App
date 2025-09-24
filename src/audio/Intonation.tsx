@@ -1,6 +1,7 @@
 import { PitchDetector } from "pitchy";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import { prepareAudio } from "../utils/audioUtils";
+import { NoteColor } from "../utils/musicXmlUtils";
 
 const OCTAVE_OFF_THRESHOLD = 2;
 const SEMITONE_THRESHOLD = 2;
@@ -222,4 +223,19 @@ export async function testIntonation(
   }));
 
   console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
+}
+
+export function intonationToColors(intonationArr: number[]): NoteColor[] {
+  return intonationArr.map((val, idx) => {
+    let color = "#000000";
+    if (Math.abs(val) < 0.1) {
+      color = "#000000";
+    } else if (val > 0) {
+      color = "#00FF00";
+    } else {
+      color = "#FF0000";
+    }
+
+    return { index: idx, color: color };
+  });
 }
