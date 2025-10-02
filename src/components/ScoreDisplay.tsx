@@ -13,12 +13,12 @@ import scoresData from "../score_name_to_data_map/scoreToMusicxmlMap"; // Local 
 import { WebView } from "react-native-webview";
 import {
   advanceToNextBeat,
+  applyNoteColors,
   buildOsmdHtmlForNative,
   initOsmdWeb,
   onHandleOsmdMessageForNative,
   peekAtCurrentBeat,
 } from "../utils/osmdUtils"; // Helper functions used to manipulate the OSMD Display
-import { colorNotesInMusicXML } from "../utils/musicXmlUtils";
 
 export default function ScoreDisplay({
   state,
@@ -129,28 +129,6 @@ export default function ScoreDisplay({
     moveCursorByBeats(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 
-  // // Note coloring effect
-  // useEffect(() => {
-  //   if (typeof state.estimatedPitch !== "number") return;
-  //   if (!osdRef.current || !cursorRef.current) return;
-
-  //   const instruments = osdRef.current.Sheet.Instruments;
-  //   const voices = cursorRef.current.VoicesUnderCursor(instruments[0]);
-  //   if (voices.length && voices[0].Notes.length) {
-  //     const note = voices[0].Notes[0];
-
-  //     console.log("Coloring by estimated pitch: ", state.estimatedPitch);
-  //     if (state.estimatedPitch < 0) {
-  //       note.NoteheadColor = "#FF0000";
-  //     } else if (state.estimatedPitch > 0) {
-  //       note.NoteheadColor = "#00FF00";
-  //     } else {
-  //       note.NoteheadColor = "#000000";
-  //     }
-  //     osdRef.current.render(); // refresh sheet with coloring applied
-  //   }
-  // }, [state.estimatedBeat, state.estimatedPitch]);
-
   // Web-only initialization
   useEffect(() => {
     initOsmdWeb(
@@ -169,21 +147,18 @@ export default function ScoreDisplay({
     scoresData[state.score] ||
     ""; // Get selected xml data from given the current score's name
 
-  const derivedXml = colorNotesInMusicXML(baseXml, state.noteColors || []);
-  console.log("Base XML", baseXml);
-  console.log("Derived XML", derivedXml);
-
   // Runtime refresh
   useEffect(() => {
-    initOsmdWeb(
-      osmContainerRef,
-      osdRef,
-      cursorRef,
-      { ...state, scoreContents: { [state.score]: derivedXml } }, 
-      dispatch,
-      isSmallScreen
-    );
-}, [dispatch, state.score, state.scores, derivedXml]);
+    const osmd = osdRef.current;
+    if (!osmd) return;
+    
+    if (!state.noteColors || state.noteColors.length === 0) {
+      // clear colors if want to reset: applyNoteColors(osmd, []);
+      return;
+    }
+
+    applyNoteColors(osmd, state.noteColors);
+  }, [state.noteColors]);
 
   return (
     <>

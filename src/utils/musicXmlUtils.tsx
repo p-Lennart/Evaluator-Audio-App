@@ -43,9 +43,9 @@ function colorNotesInnerXML(
   collectNotes(doc);
 
   noteIndicesToColor.forEach(({ index, color }) => {
-    console.log("Foreach: ", {index, color});
+    // console.log("Foreach: ", {index, color});
     const note = allNotes[index];
-    console.log("Found note", note);
+    // console.log("Found note", note);
     // Currently using <note color="..." ...> because OSMD wasn't picking up on notehead color
     if (note) note.att("color", color);
   });

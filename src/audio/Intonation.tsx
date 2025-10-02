@@ -9,6 +9,12 @@ const SEMITONE_THRESHOLD = 2;
 const AGGREGATE_DIVISOR = 2;
 const AGGREGATE_DEFAULT_SIZE = 10;
 
+const COLOR_NEUTRAL = "#000000";
+const COLOR_SHARP = "#00ff00"
+const COLOR_FLAT = "#ff0000";
+
+const MISTAKE_THRESHOLD = 0.5;
+
 function windowNumPerTs(
   timestamps: number[],
   lastWindow: number,
@@ -156,8 +162,8 @@ function estimatePitchesAtTimestamps(
     if (logging) {
       console.log(
         `Pitch #${idx}: Window num: ${windowNum} -> Direct Pitch: ${directPitch}`,
+        // console.log(`Median ${pitchEstimate}, Aggr ${diffAggregate}`);
       );
-      // console.log(`Median ${pitchEstimate}, Aggr ${diffAggregate}`);
       console.log(`... Aggregate length ${aggregateSize}`);
       console.log(`Score Pitch: `, scorePitch);
     }
@@ -186,7 +192,7 @@ export function calculateIntonation(
     audioPitches,
     sampleRate,
     hopLen,
-    true,
+    false,
   );
 }
 
@@ -225,17 +231,15 @@ export async function testIntonation(
   console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
 }
 
-export function intonationToColors(intonationArr: number[]): NoteColor[] {
-  return intonationArr.map((val, idx) => {
-    let color = "#000000";
-    if (Math.abs(val) < 0.1) {
-      color = "#000000";
-    } else if (val > 0) {
-      color = "#00FF00";
-    } else {
-      color = "#FF0000";
-    }
+export function intonationToNoteColor(intonation: number, noteIdx: number) {
+  let color: string;
+  if (Math.abs(intonation) < MISTAKE_THRESHOLD) {
+    color = COLOR_NEUTRAL;
+  } else if (intonation > 0) {
+    color = COLOR_SHARP;
+  } else {
+    color = COLOR_FLAT;
+  }
 
-    return { index: idx, color: color };
-  });
+  return { index: noteIdx, color: color };
 }
