@@ -145,7 +145,7 @@ function estimatePitchesAtTimestamps(
         diff = diff % 12;
       }
 
-      if (diff > SEMITONE_THRESHOLD) return undefined;
+      if (Math.abs(diff) > SEMITONE_THRESHOLD) return undefined;
       return diff;
     });
 
