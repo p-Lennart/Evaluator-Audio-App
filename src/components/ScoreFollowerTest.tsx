@@ -45,7 +45,8 @@ import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import { refAssetMap } from "../score_name_to_data_map/scoreToCsvMap";
 import { csvAssetMap } from "../score_name_to_data_map/scoreToWavMap";
 
-import { calculateIntonation, testIntonation } from "../audio/Intonation";
+import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
+import { NoteColor } from "../utils/musicXmlUtils";
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
@@ -101,7 +102,7 @@ export default function ScoreFollowerTest({
     // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
     // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
 
-    const audioUri = "/air_on_the_g_string/baseline/instrument_0.wav";
+    const audioUri = "/air_on_the_g_string/altered/aotgs_pitchy.wav";
     const csvUri = "/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv";
 
     await testIntonation(audioUri, csvUri, 44100);
@@ -187,17 +188,35 @@ export default function ScoreFollowerTest({
         const intonation = calculateIntonation(
           audioData,
           scorePitchesCol,
-          predictedTimes,
+          refTimes,
           sr,
           intonationParams[0],
           intonationParams[1],
         );
+
+        // Debug sequence: tiled flat-neutral-sharp
+        // let debugTmp = intonation;
+        // debugTmp = debugTmp.map( (el, idx) => (idx % 3) - 1);
+
+        // console.log("Debug tmp", debugTmp);
+        // dispatch({
+        //   type: "SET_NOTE_COLORS",
+        //   payload: intonationToColors(debugTmp)
+        // });
 
         // Update CSV struct arr with intonation values for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
           ...row,
           intonation: intonation[i],
         }));
+
+        const newTable = csvDataRef.current.map((row, i) => ({
+          time: row.refTime,
+          midi: row.midi,
+          intonation: intonation[i],
+        }));
+
+        console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
       }
 
       console.log(pathRef.current); // Show full path
@@ -208,6 +227,7 @@ export default function ScoreFollowerTest({
         if (!status.isLoaded) return; // Exit early if sound isn't loaded
         const currentTimeSec = status.positionMillis / 1000; // Convert current playback time from milliseconds to seconds
 
+        let iterations = 0;
         while (
           // Process only if the frame is within bounds and we have passed a predicted time of current csv row
           nextIndexRef.current < csvDataRef.current.length &&
@@ -215,9 +235,21 @@ export default function ScoreFollowerTest({
             csvDataRef.current[nextIndexRef.current].predictedTime
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
-          const pitch = csvDataRef.current[nextIndexRef.current].intonation; // Get beat of that note
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
-          dispatch({ type: "SET_ESTIMATED_PITCH", payload: pitch });
+          
+          if (iterations % 10 == 0) {
+            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current);
+            
+            const noteColors: NoteColor[] = intonationChunk.map((row, idx) => {
+              return intonationToNoteColor(row.intonation, 0 + idx);
+            });
+
+            dispatch({
+                type: "SET_NOTE_COLORS",
+                payload: noteColors,
+            });
+          } 
+
           nextIndexRef.current++; // Go to next row of csv
         }
 
