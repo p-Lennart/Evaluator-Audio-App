@@ -24,75 +24,119 @@ import { FeaturesConstructor } from "../audio/Features";
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { dot } from "../audio/FeaturesCENS";
 import DynamicTimeWarping from "dynamic-time-warping-ts";
+import { RefreshControl } from "react-native";
 
 /**
  * Given a DTW warping path and reference audio timestamps, compute estimated live audio timestamps.
  *
  * @param warpingPath - Array of [refFrameIndex, liveFrameIndex] pairs from dynamic time warping
- * @param frameSec - Duration of each frame in seconds (step size)
+ * @param stepSize - Duration of each frame in seconds
  * @param refTimes - Array of reference audio timestamps (in seconds)
  * @returns Array of estimated live audio timestamps aligned to the reference
+ *
+ * Optional:
+ * - enforceNonDecreasing: if true, clamps output so it never goes below the previous value (default: true)
+ * - debug: if true, prints helpful diagnostic logs
  */
 export const calculateWarpedTimes = (
   warpingPath: number[][],
   stepSize: number,
   refTimes: number[],
+  enforceNonDecreasing = true,
+  debug = false,
 ): number[] => {
-  const warpedTimes: number[] = [];
+  if (!warpingPath || warpingPath.length === 0) return refTimes.map(() => 0);
 
-  // Apply step size to both axes of the warping path
+  // Build arrays of path times (seconds)
   const pathTimes = warpingPath.map(
-    ([refIdx, liveIdx]) =>
-      [refIdx * stepSize, liveIdx * stepSize] as [number, number],
+    ([refIdx, liveIdx]) => [refIdx * stepSize, liveIdx * stepSize] as [number, number],
   );
-  const refPathTimes = pathTimes.map((pt) => pt[0]);
-  const livePathTimes = pathTimes.map((pt) => pt[1]);
+  const refPathTimes = pathTimes.map((p) => p[0]);
+  const livePathTimes = pathTimes.map((p) => p[1]);
 
-  for (const queryTime of refTimes) {
-    // Compute diffs from every refPathTime
-    const diffs = refPathTimes.map((t) => t - queryTime);
-    // Find index of the minimum absolute diff
-    let idx = 0;
-    let minAbs = Math.abs(diffs[0]);
-    for (let i = 1; i < diffs.length; i++) {
-      const absDi = Math.abs(diffs[i]);
-      if (absDi < minAbs) {
-        minAbs = absDi;
-        idx = i;
-      }
-    }
+  const n = refPathTimes.length;
+  const eps = Number.EPSILON * 1e3; // small tolerance for equality comparisons
+  const warped: number[] = [];
 
-    // Choose a pair of points to interpolate between
-    let leftIdx: number, rightIdx: number;
-    if (diffs[idx] >= 0 && idx > 0) {
-      leftIdx = idx - 1;
-      rightIdx = idx;
-    } else if (idx + 1 < livePathTimes.length) {
-      leftIdx = idx;
-      rightIdx = idx + 1;
-    } else {
-      leftIdx = rightIdx = idx;
-    }
+  // Pointer into path that we advance monotonically as refTimes increase.
+  // We'll ensure pointer i points to the left index (or 0 initially).
+  let i = 0;
 
-    // If no interpolation needed, just take the point
-    if (leftIdx === rightIdx) {
-      warpedTimes.push(livePathTimes[leftIdx]);
+  for (const q of refTimes) {
+    // If query is before or equal first path time, snap to first
+    if (q <= refPathTimes[0] + eps) {
+      const t = livePathTimes[0];
+      const clamped = (enforceNonDecreasing && warped.length && t < warped[warped.length - 1] - eps)
+        ? warped[warped.length - 1]
+        : t;
+      if (debug) console.log('Q before first path time', q, '->', clamped);
+      warped.push(clamped);
       continue;
     }
 
-    // Linear interpolation fraction along the ref‐path segment
-    const queryRefOffset = queryTime - refPathTimes[leftIdx]; // ≥ 0
-    const queryOffsetNorm =
-      queryRefOffset === 0 ? 0 : queryRefOffset / stepSize;
+    // Advance pointer while the next refPathTime is still < q
+    while (i < n - 1 && refPathTimes[i + 1] < q - eps) {
+      i++;
+    }
 
-    // Project that fraction into the live‐path segment
-    const liveMaxOffset = livePathTimes[rightIdx] - livePathTimes[leftIdx];
-    const queryOffsetLive = liveMaxOffset * queryOffsetNorm;
+    // If we've reached the end, snap to last
+    if (i >= n - 1) {
+      const t = livePathTimes[n - 1];
+      const clamped = (enforceNonDecreasing && warped.length && t < warped[warped.length - 1] - eps)
+        ? warped[warped.length - 1]
+        : t;
+      if (debug) console.log('Q past last path time', q, '->', clamped);
+      warped.push(clamped);
+      continue;
+    }
 
-    warpedTimes.push(livePathTimes[leftIdx] + queryOffsetLive);
+    // Now i is such that refPathTimes[i] <~ q <= refPathTimes[i+1]
+    const leftIdx = i;
+    const rightIdx = i + 1;
+
+    const leftRefT = refPathTimes[leftIdx];
+    const rightRefT = refPathTimes[rightIdx];
+    const leftLiveT = livePathTimes[leftIdx];
+    const rightLiveT = livePathTimes[rightIdx];
+
+    const denom = rightRefT - leftRefT;
+
+    let tCandidate: number;
+
+    if (Math.abs(denom) <= eps) {
+      // Plateau in ref axis: find the rightmost index of this plateau and use its live time.
+      let plateauRight = rightIdx;
+      while (plateauRight + 1 < n && Math.abs(refPathTimes[plateauRight + 1] - leftRefT) <= eps) {
+        plateauRight++;
+      }
+      tCandidate = livePathTimes[plateauRight];
+      if (debug) {
+        console.log('Plateau handling', { q, leftIdx, rightIdx, plateauRight, leftRefT, tCandidate });
+      }
+    } else {
+      // Normal linear interpolation between left and right path points using actual denom
+      const frac = (q - leftRefT) / denom;
+      tCandidate = leftLiveT + frac * (rightLiveT - leftLiveT);
+      if (debug) {
+        console.log('Interp', { q, leftIdx, rightIdx, leftRefT, rightRefT, frac, leftLiveT, rightLiveT, tCandidate });
+      }
+    }
+
+    // Optional clamp to avoid the warped times going backwards (monotonic smoothing).
+    if (enforceNonDecreasing && warped.length > 0) {
+      const prev = warped[warped.length - 1];
+      if (tCandidate < prev - eps) {
+        if (debug) {
+          console.log('Clamping to preserve monotonicity', { prev, tCandidate, q, leftIdx, rightIdx });
+        }
+        tCandidate = prev;
+      }
+    }
+
+    warped.push(tCandidate);
   }
 
-  return warpedTimes;
+  return warped;
 };
 
 /**
