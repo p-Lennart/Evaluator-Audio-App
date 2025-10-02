@@ -164,6 +164,7 @@ export const peekAtCurrentBeat = (
   return delta;
 };
 
+// Match music21 flatten().notes generated csvs: no rests, all notes (normal, tied, grace) 
 export function getAllGraphicalNotes(osmd: any): any[] {
   const notes: any[] = [];
   const sheet = osmd.GraphicSheet;
@@ -173,6 +174,12 @@ export function getAllGraphicalNotes(osmd: any): any[] {
     for (const staffEntry of gMeasure.staffEntries ?? []) {
       for (const gve of staffEntry.graphicalVoiceEntries ?? []) {
         for (const gNote of gve.notes ?? []) {
+          const src = gNote.sourceNote;
+          if (!src) continue;
+
+          // filter out rests  as per music21.notes
+          if (src.isRest && src.isRest()) continue;
+
           notes.push(gNote);
         }
       }

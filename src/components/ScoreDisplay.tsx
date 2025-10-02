@@ -80,7 +80,7 @@ export default function ScoreDisplay({
       ); // Intialbeats = beat value of the current note that the cursor is on
     }
     movedBeats.current = initialBeats; // This is accounting for the first note that the cursor highlights at the beginning
-    console.log("movedBeats :", movedBeats);
+    // console.log("movedBeats :", movedBeats);
 
     // Calculate how many beats we need to move forward
     const toMove = Math.max(0, targetBeats);
@@ -197,7 +197,7 @@ export default function ScoreDisplay({
           <WebView
             ref={webviewRef}
             originWhitelist={["*"]}
-            source={{ html: buildOsmdHtmlForNative(derivedXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
+            source={{ html: buildOsmdHtmlForNative(baseXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
             onMessage={(e) =>
               onHandleOsmdMessageForNative(e.nativeEvent.data, dispatch)
             } // Call function when page inside this Webview calls postMessage

@@ -156,7 +156,7 @@ export default function ScoreFollowerTest({
       {
         console.log("-- precompute CSV block: score=", score, "→ base=", base);
         const csvUri = isWeb
-          ? `/${base}/baseline/aotgs_solo_100bpm.csv`
+          ? `/${base}/baseline/schumann_melody_4sec.csv`
           : Asset.fromModule(csvAssetMap[base]).uri; // Path the CSV given score name (web and alternative expo go version)
         console.log("-- CSV URI =", csvUri);
 
