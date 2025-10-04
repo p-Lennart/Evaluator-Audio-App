@@ -38,3 +38,6 @@ yarn-error.*
 .vscode
 
 /coverage
+
+console_logs.txt
+task_analysis_parser.py

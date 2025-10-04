@@ -43,10 +43,9 @@ def parse_cursor_logs(file_path):
     print(f"(50-100ms): {good}/{len(delays)} ({good/len(delays)*100:.1f}%)")
     print(f"(>100ms): {poor}/{len(delays)} ({poor/len(delays)*100:.1f}%)")
     
-    # Show timing differences if available
     if timing_logs:
         diffs = [float(diff) * 1000 for audio, predicted, diff, beat in timing_logs]  # Convert to ms
-        print(f"\nAudio vs Predicted Timing:")
+        print(f"\nFrame-by-frame timing checks:")
         print(f"Average Difference: {mean(diffs):.1f}ms")
         print(f"Median Difference: {median(diffs):.1f}ms")
         

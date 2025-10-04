@@ -42,8 +42,11 @@ import {
   pickMobileWavFile,
 } from "../utils/fileSelectorUtils";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
-import { refAssetMap } from "../score_name_to_data_map/scoreToCsvMap";
-import { csvAssetMap } from "../score_name_to_data_map/scoreToWavMap";
+import { 
+  getScoreRefAudio, 
+  getScoreCSVData,
+  unifiedScoreMap 
+} from "../score_name_to_data_map/unifiedScoreMap";
 
 import { calculateIntonation, testIntonation } from "../audio/Intonation";
 
@@ -118,9 +121,8 @@ export default function ScoreFollowerTest({
     setPerformanceComplete(false); // Set performance complete boolean to false
 
     try {
-      const refUri = isWeb
-        ? `/${base}/baseline/instrument_0.wav`
-        : Asset.fromModule(refAssetMap[base]).uri; // Path to reference wav file of selected score depending on web or expo go version
+      // Use unified mapping for cross-platform file access
+      const refUri = getScoreRefAudio(base);
 
       console.log("-- Creating ScoreFollower...");
       followerRef.current = await ScoreFollower.create(refUri, FeaturesCls); // Initialize score follower instance (default parameters from ScoreFollower.tsx)
@@ -154,9 +156,8 @@ export default function ScoreFollowerTest({
 
       {
         console.log("-- precompute CSV block: score=", score, "→ base=", base);
-        const csvUri = isWeb
-          ? `/${base}/baseline/aotgs_solo_100bpm.csv`
-          : Asset.fromModule(csvAssetMap[base]).uri; // Path the CSV given score name (web and alternative expo go version)
+        // Use unified mapping for CSV file access
+        const csvUri = getScoreCSVData(base);
         console.log("-- CSV URI =", csvUri);
 
         console.log("-- Calling loadCsvInfo(csvUri, isWeb=", isWeb, ")…");
@@ -169,6 +170,7 @@ export default function ScoreFollowerTest({
         const warpingPath = pathRef.current; // The Dynamic Time Warping path: an array of [referenceIndex, liveIndex] pairs
         const refTimes = csvDataRef.current.map((r) => r.refTime); // Pull out just the reference times from each row to feed into the calculateWarpedTimes()
 
+        /*
         const predictedTimes = calculateWarpedTimes(
           // Obtain array of ESTIMATED timestamps of when each note is played in the live audio
           warpingPath,
@@ -178,6 +180,9 @@ export default function ScoreFollowerTest({
           false,
           false, // Turn off perfect timestamps for normal operation
         );
+        */
+       
+        const predictedTimes = refTimes;
 
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
@@ -213,13 +218,13 @@ export default function ScoreFollowerTest({
         if (!status.isLoaded) return; // Exit early if sound isn't loaded
         const currentTimeSec = status.positionMillis / 1000; // Convert current playback time from milliseconds to seconds
 
-        // Console logging for cursor dispatch analysis
-        if (nextIndexRef.current < csvDataRef.current.length) {
-          const nextNote = csvDataRef.current[nextIndexRef.current];
-          const timeDiff = currentTimeSec - nextNote.predictedTime;
-          const willDispatch = currentTimeSec >= nextNote.predictedTime;
-          console.log(`Dispatch Timing: Audio=${currentTimeSec.toFixed(3)}s, Predicted=${nextNote.predictedTime.toFixed(3)}s, Diff=${timeDiff.toFixed(3)}s, Beat=${nextNote.beat}`);
-        }
+        // Console logging for cursor dispatch analysis : COMMENTED OUT
+        // if (nextIndexRef.current < csvDataRef.current.length) {
+        //   const nextNote = csvDataRef.current[nextIndexRef.current];
+        //   const timeDiff = currentTimeSec - nextNote.predictedTime;
+        //   const willDispatch = currentTimeSec >= nextNote.predictedTime;
+        //   console.log(`Dispatch Timing: Audio=${currentTimeSec.toFixed(3)}s, Predicted=${nextNote.predictedTime.toFixed(3)}s, Diff=${timeDiff.toFixed(3)}s, Beat=${nextNote.beat}`);
+        // }
 
         while (
           // Process only if the frame is within bounds and we have passed a predicted time of current csv row
@@ -246,7 +251,7 @@ export default function ScoreFollowerTest({
         }
       };
 
-      const soundSource = { uri: liveFile.uri }; // Extract live wav file's uri
+      const soundSource = { uri: refUri };
       dispatch({ type: "toggle_loading_performance" }); // Toggle loading boolean (to false in this case)
 
       // Create and load the sound object from the live audio URI
@@ -254,7 +259,7 @@ export default function ScoreFollowerTest({
         soundSource, // Pass in the live wav file's uri as argument
         {
           shouldPlay: true, // Automatically start playback once loaded
-          progressUpdateIntervalMillis: 20, // Set how often status updates are triggered
+          progressUpdateIntervalMillis: 10, // Set how often status updates are triggered
         },
         onPlaybackStatusUpdate, // Callback to handle playback progress (frame processing, alignment, etc.)
       );
