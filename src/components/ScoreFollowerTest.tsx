@@ -1,29 +1,7 @@
-// # The MIT License (MIT)
-
-// Copyright (c) 2016 PART <info@gordonlesti.com>, <https://fheyen.github.io/>
-
-// > Permission is hereby granted, free of charge, to any person obtaining a copy
-// > of this software and associated documentation files (the "Software"), to deal
-// > in the Software without restriction, including without limitation the rights
-// > to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// > copies of the Software, and to permit persons to whom the Software is
-// > furnished to do so, subject to the following conditions:
-// >
-// > The above copyright notice and this permission notice shall be included in
-// > all copies or substantial portions of the Software.
-// >
-// > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// > IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// > FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// > THE SOFTWARE.
-
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Audio, AVPlaybackStatus } from "expo-av";
-import { decode } from "wav-decoder";
+
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { CENSFeatures } from "../audio/FeaturesCENS";
 import { FeaturesConstructor } from "../audio/Features";
@@ -42,8 +20,11 @@ import {
   pickMobileWavFile,
 } from "../utils/fileSelectorUtils";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
-import { refAssetMap } from "../score_name_to_data_map/scoreToCsvMap";
-import { csvAssetMap } from "../score_name_to_data_map/scoreToWavMap";
+import { 
+  getScoreRefAudio, 
+  getScoreCSVData,
+  unifiedScoreMap 
+} from "../score_name_to_data_map/unifiedScoreMap"
 
 import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
 import { NoteColor } from "../utils/musicXmlUtils";
@@ -102,7 +83,7 @@ export default function ScoreFollowerTest({
     // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
     // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
 
-    const audioUri = "/air_on_the_g_string/altered/aotgs_pitchy.wav";
+    const audioUri = "/air_on_the_g_string/baseline/instrument_0.wav";
     const csvUri = "/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv";
 
     await testIntonation(audioUri, csvUri, 44100);
@@ -119,9 +100,8 @@ export default function ScoreFollowerTest({
     setPerformanceComplete(false); // Set performance complete boolean to false
 
     try {
-      const refUri = isWeb
-        ? `/${base}/baseline/instrument_0.wav`
-        : Asset.fromModule(refAssetMap[base]).uri; // Path to reference wav file of selected score depending on web or expo go version
+      // Use unified mapping for cross-platform file access
+      const refUri = getScoreRefAudio(base);
 
       console.log("-- Creating ScoreFollower...");
       followerRef.current = await ScoreFollower.create(refUri, FeaturesCls); // Initialize score follower instance (default parameters from ScoreFollower.tsx)
@@ -155,9 +135,8 @@ export default function ScoreFollowerTest({
 
       {
         console.log("-- precompute CSV block: score=", score, "→ base=", base);
-        const csvUri = isWeb
-          ? `/${base}/baseline/schumann_melody_4sec.csv`
-          : Asset.fromModule(csvAssetMap[base]).uri; // Path the CSV given score name (web and alternative expo go version)
+        // Use unified mapping for CSV file access
+        const csvUri = getScoreCSVData(base);
         console.log("-- CSV URI =", csvUri);
 
         console.log("-- Calling loadCsvInfo(csvUri, isWeb=", isWeb, ")…");
