@@ -25,8 +25,8 @@ import {
   getScoreCSVData,
   unifiedScoreMap 
 } from "../score_name_to_data_map/unifiedScoreMap"
-
-import { calculateIntonation, testIntonation } from "../audio/Intonation";
+import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
+import { NoteColor } from "../utils/musicXmlUtils";
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
