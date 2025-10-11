@@ -166,7 +166,7 @@ export default function ScoreFollowerTest({
         const intonation = calculateIntonation(
           audioData,
           scorePitchesCol,
-          refTimes,
+          predictedTimes,
           sr,
           intonationParams[0],
           intonationParams[1],
@@ -216,9 +216,12 @@ export default function ScoreFollowerTest({
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
           
           if (iterations % 10 == 0) {
-            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current);
+            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current + 1);
             
             const noteColors: NoteColor[] = intonationChunk.map((row, idx) => {
+              if (idx == nextIndexRef.current) {
+                return { index: idx, color: "#5555FF" } // highlight current note
+              }
               return intonationToNoteColor(row.intonation, 0 + idx);
             });
 

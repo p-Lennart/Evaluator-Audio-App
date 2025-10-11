@@ -6,7 +6,7 @@ import { NoteColor } from "../utils/musicXmlUtils";
 const OCTAVE_OFF_THRESHOLD = 2;
 const SEMITONE_THRESHOLD = 2;
 
-const AGGREGATE_DIVISOR = 2;
+const AGGREGATE_DIVISOR = 1.1;
 const AGGREGATE_DEFAULT_SIZE = 10;
 
 const COLOR_NEUTRAL = "#000000";
