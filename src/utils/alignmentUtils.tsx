@@ -20,80 +20,124 @@
 // > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // > THE SOFTWARE.
 
-import { FeaturesConstructor } from "../audio/features";
+import { FeaturesConstructor } from "../audio/Features";
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { dot } from "../audio/FeaturesCENS";
 import DynamicTimeWarping from "dynamic-time-warping-ts";
+import { RefreshControl } from "react-native";
 
 /**
  * Given a DTW warping path and reference audio timestamps, compute estimated live audio timestamps.
  *
  * @param warpingPath - Array of [refFrameIndex, liveFrameIndex] pairs from dynamic time warping
- * @param frameSec - Duration of each frame in seconds (step size)
+ * @param stepSize - Duration of each frame in seconds
  * @param refTimes - Array of reference audio timestamps (in seconds)
  * @returns Array of estimated live audio timestamps aligned to the reference
+ *
+ * Optional:
+ * - enforceNonDecreasing: if true, clamps output so it never goes below the previous value (default: true)
+ * - debug: if true, prints helpful diagnostic logs
  */
 export const calculateWarpedTimes = (
-    warpingPath: number[][],
-    stepSize: number,
-    refTimes: number[], 
-): number[] => 
-{
-  const warpedTimes: number[] = [];
+  warpingPath: number[][],
+  stepSize: number,
+  refTimes: number[],
+  enforceNonDecreasing = true,
+  debug = false,
+): number[] => {
+  if (!warpingPath || warpingPath.length === 0) return refTimes.map(() => 0);
 
-  // Apply step size to both axes of the warping path
-  const pathTimes = warpingPath.map(([refIdx, liveIdx]) => [refIdx * stepSize, liveIdx * stepSize] as [number, number]);
-  const refPathTimes = pathTimes.map(pt => pt[0]);
-  const livePathTimes = pathTimes.map(pt => pt[1]);
+  // Build arrays of path times (seconds)
+  const pathTimes = warpingPath.map(
+    ([refIdx, liveIdx]) => [refIdx * stepSize, liveIdx * stepSize] as [number, number],
+  );
+  const refPathTimes = pathTimes.map((p) => p[0]);
+  const livePathTimes = pathTimes.map((p) => p[1]);
 
-  for (const queryTime of refTimes) {
-    // Compute diffs from every refPathTime
-    const diffs = refPathTimes.map(t => t - queryTime);
-    // Find index of the minimum absolute diff
-    let idx = 0;
-    let minAbs = Math.abs(diffs[0]);
-    for (let i = 1; i < diffs.length; i++) {
-      const absDi = Math.abs(diffs[i]);
-      if (absDi < minAbs) {
-        minAbs = absDi;
-        idx = i;
-      }
-    }
+  const n = refPathTimes.length;
+  const eps = Number.EPSILON * 1e3; // small tolerance for equality comparisons
+  const warped: number[] = [];
 
-    // Choose a pair of points to interpolate between
-    let leftIdx: number, rightIdx: number;
-    if (diffs[idx] >= 0 && idx > 0) {
-      leftIdx = idx - 1;
-      rightIdx = idx;
-    } else if (idx + 1 < livePathTimes.length) {
-      leftIdx = idx;
-      rightIdx = idx + 1;
-    } else {
-      leftIdx = rightIdx = idx;
-    }
+  // Pointer into path that we advance monotonically as refTimes increase.
+  // We'll ensure pointer i points to the left index (or 0 initially).
+  let i = 0;
 
-    // If no interpolation needed, just take the point
-    if (leftIdx === rightIdx) {
-      warpedTimes.push(livePathTimes[leftIdx]);
+  for (const q of refTimes) {
+    // If query is before or equal first path time, snap to first
+    if (q <= refPathTimes[0] + eps) {
+      const t = livePathTimes[0];
+      const clamped = (enforceNonDecreasing && warped.length && t < warped[warped.length - 1] - eps)
+        ? warped[warped.length - 1]
+        : t;
+      if (debug) console.log('Q before first path time', q, '->', clamped);
+      warped.push(clamped);
       continue;
     }
 
-    // Linear interpolation fraction along the ref‐path segment
-    const queryRefOffset = queryTime - refPathTimes[leftIdx];  // ≥ 0
-    const queryOffsetNorm = queryRefOffset === 0
-      ? 0
-      : queryRefOffset / stepSize;
+    // Advance pointer while the next refPathTime is still < q
+    while (i < n - 1 && refPathTimes[i + 1] < q - eps) {
+      i++;
+    }
 
-    // Project that fraction into the live‐path segment
-    const liveMaxOffset = livePathTimes[rightIdx] - livePathTimes[leftIdx];
-    const queryOffsetLive = liveMaxOffset * queryOffsetNorm;
+    // If we've reached the end, snap to last
+    if (i >= n - 1) {
+      const t = livePathTimes[n - 1];
+      const clamped = (enforceNonDecreasing && warped.length && t < warped[warped.length - 1] - eps)
+        ? warped[warped.length - 1]
+        : t;
+      if (debug) console.log('Q past last path time', q, '->', clamped);
+      warped.push(clamped);
+      continue;
+    }
 
-    warpedTimes.push(livePathTimes[leftIdx] + queryOffsetLive);
+    // Now i is such that refPathTimes[i] <~ q <= refPathTimes[i+1]
+    const leftIdx = i;
+    const rightIdx = i + 1;
+
+    const leftRefT = refPathTimes[leftIdx];
+    const rightRefT = refPathTimes[rightIdx];
+    const leftLiveT = livePathTimes[leftIdx];
+    const rightLiveT = livePathTimes[rightIdx];
+
+    const denom = rightRefT - leftRefT;
+
+    let tCandidate: number;
+
+    if (Math.abs(denom) <= eps) {
+      // Plateau in ref axis: find the rightmost index of this plateau and use its live time.
+      let plateauRight = rightIdx;
+      while (plateauRight + 1 < n && Math.abs(refPathTimes[plateauRight + 1] - leftRefT) <= eps) {
+        plateauRight++;
+      }
+      tCandidate = livePathTimes[plateauRight];
+      if (debug) {
+        console.log('Plateau handling', { q, leftIdx, rightIdx, plateauRight, leftRefT, tCandidate });
+      }
+    } else {
+      // Normal linear interpolation between left and right path points using actual denom
+      const frac = (q - leftRefT) / denom;
+      tCandidate = leftLiveT + frac * (rightLiveT - leftLiveT);
+      if (debug) {
+        console.log('Interp', { q, leftIdx, rightIdx, leftRefT, rightRefT, frac, leftLiveT, rightLiveT, tCandidate });
+      }
+    }
+
+    // Optional clamp to avoid the warped times going backwards (monotonic smoothing).
+    if (enforceNonDecreasing && warped.length > 0) {
+      const prev = warped[warped.length - 1];
+      if (tCandidate < prev - eps) {
+        if (debug) {
+          console.log('Clamping to preserve monotonicity', { prev, tCandidate, q, leftIdx, rightIdx });
+        }
+        tCandidate = prev;
+      }
+    }
+
+    warped.push(tCandidate);
   }
 
-  return warpedTimes;
-}
-
+  return warped;
+};
 
 /**
  * Computes the full dynamic time warping alignment path for the given audio data.
@@ -111,14 +155,15 @@ export const precomputeAlignmentPath = async(
 {
 
   const totalFrames = Math.ceil(audioData.length / frameSize); // Total number of frames we need to process to cover the audio buffer
-  console.log(`precomputeAlignmentPath: totalFrames = ${totalFrames}, frameSize = ${frameSize}`);
+  console.log(
+    `precomputeAlignmentPath: totalFrames = ${totalFrames}, frameSize = ${frameSize}`,
+  );
   const path: [number, number][] = []; // Holds the mapping between reference and live frame indices
 
   // Process each frame of audio
   for (let i = 0; i < totalFrames; i++) {
-
     // Slice the next frame of audio data
-    const start = i * frameSize; 
+    const start = i * frameSize;
     let frame = audioData.subarray(start, start + frameSize);
 
     // Pad the frame if it's shorter than expected
@@ -127,25 +172,28 @@ export const precomputeAlignmentPath = async(
       pad.set(frame);
       frame = pad;
     }
-    // Step the ScoreFollower with this frame 
+    // Step the ScoreFollower with this frame
     // This updates the follower's internal path and returns an estimated time in seconds
     console.log(`    Calling follower.step() on frame ${i}`);
     const timeSec = await follower.step(Array.from(frame)); 
     console.log(`    -- step returned timeSec = ${timeSec.toFixed(3)}s`);
 
     const last = follower.path[follower.path.length - 1] as [number, number]; // Capture the last updated warping step
-    console.log(`    Latest path entry [refIdx, liveIdx] = [${last[0]}, ${last[1]}]`);
+    console.log(
+      `    Latest path entry [refIdx, liveIdx] = [${last[0]}, ${last[1]}]`,
+    );
     path.push(last); // Store this alignment point in our output path
-
   }
 
-  console.log(`precomputeAlignmentPath: completed, path length = ${path.length}`);
+  console.log(
+    `precomputeAlignmentPath: completed, path length = ${path.length}`,
+  );
   return path;
-}
+};
 
 /**
  * Computes an **offline** dynamic time warping (DTW) alignment path between a reference feature sequence and a live audio recording.
- * 
+ *
  * @param refFeatures - Precomputed featuregram for the reference score audio
  * @param liveAudioData - Raw mono PCM live audio as Float32Array
  * @param FeaturesCls - Class constructor used to extract features (e.g., CENS, MFCC, etc.)
@@ -170,10 +218,10 @@ export const computeOfflineAlignmentPath = async( refFeatures: any,
 
   // Run Offline DTW given full features
   const dtw = new DynamicTimeWarping(
-    refFeatures,    // Full ref features
-    liveFeatures,   // Full live features
-    censDistance // Distance function
+    refFeatures, // Full ref features
+    liveFeatures, // Full live features
+    censDistance, // Distance function
   );
 
-  return dtw.getPath() // Return full path after run
-}
+  return dtw.getPath(); // Return full path after run
+};
