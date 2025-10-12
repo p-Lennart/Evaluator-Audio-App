@@ -69,9 +69,9 @@ export default class OnlineTimeWarping {
      * @param audioFrame - Live audio frame as number[]
      * @returns Estimated position in the reference sequence
      */
-    insert(audioFrame: number[]): number {
+    async insert(audioFrame: number[]): Promise<number> {
         this.liveIdx += 1;
-        this.live.insert(audioFrame);
+        await this.live.insert(audioFrame);
 
         const startTime = new Date();
 

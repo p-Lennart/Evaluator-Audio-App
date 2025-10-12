@@ -6,6 +6,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.Arguments
 import be.tarsos.dsp.util.fft.FFT
 import kotlin.FloatArray
 
@@ -15,9 +16,9 @@ class FFTModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     }
 
     @ReactMethod
-    fun fft(fftSize: Int, signalDataIn: ReadableArray, promise: Promise) {
+    fun fft(signalDataIn: ReadableArray, promise: Promise) {
         try {
-            val fftLib = FFT(fftSize)
+            val fftLib = FFT(signalDataIn.size())
 
             val signalData = FloatArray(signalDataIn.size())
             for (i in signalData.indices) {
@@ -25,7 +26,10 @@ class FFTModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
             }
 
             fftLib.forwardTransform(signalData)
-            promise.resolve(signalData)
+
+            val result = Arguments.fromArray(signalData)
+
+            promise.resolve(result)
         } catch (e: Exception) {
             promise.reject("FFT_ERROR", e)
         }

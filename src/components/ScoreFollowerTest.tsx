@@ -147,7 +147,7 @@ export default function ScoreFollowerTest({
       console.log(`Loading live audio took ${endTime - startTime}ms`);
 
       console.log('-- Computing alignment path...');
-      pathRef.current = precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path 
+      pathRef.current = await precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path 
       console.log('-- Alignment path length=', pathRef.current.length);
 
 
@@ -227,7 +227,7 @@ export default function ScoreFollowerTest({
       
 
     } catch (err) {
-      console.error('ScoreFollower Error:', err);
+      console.error('ScoreFollower Error:', err, err.stack);
       dispatch({ type: 'start/stop',});
     }
   };

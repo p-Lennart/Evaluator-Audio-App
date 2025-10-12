@@ -103,11 +103,11 @@ export const calculateWarpedTimes = (
  * @param follower - Initialized ScoreFollower instance
  * @returns An array of [refFrameIndex, liveFrameIndex] pairs representing the alignment path
  */
-export const precomputeAlignmentPath = (
+export const precomputeAlignmentPath = async(
   audioData: Float32Array,
   frameSize: number,
   follower: ScoreFollower
-): [number, number][] =>
+): Promise<[number, number][]> =>
 {
 
   const totalFrames = Math.ceil(audioData.length / frameSize); // Total number of frames we need to process to cover the audio buffer
@@ -130,7 +130,7 @@ export const precomputeAlignmentPath = (
     // Step the ScoreFollower with this frame 
     // This updates the follower's internal path and returns an estimated time in seconds
     console.log(`    Calling follower.step() on frame ${i}`);
-    const timeSec = follower.step(Array.from(frame)); 
+    const timeSec = await follower.step(Array.from(frame)); 
     console.log(`    -- step returned timeSec = ${timeSec.toFixed(3)}s`);
 
     const last = follower.path[follower.path.length - 1] as [number, number]; // Capture the last updated warping step
@@ -153,19 +153,16 @@ export const precomputeAlignmentPath = (
  * @param windowLength - Analysis window size in samples (frame size)
  * @returns Array of index pairs [refFrameIndex, liveFrameIndex] from the DTW alignment
  */
-export const computeOfflineAlignmentPath = ( refFeatures: any,
+export const computeOfflineAlignmentPath = async( refFeatures: any,
   liveAudioData: Float32Array,
   FeaturesCls: FeaturesConstructor<any>,
   sampleRate: number,
-  windowLength: number): Array<[number, number]> => 
+  windowLength: number): Promise<Array<[number, number]>> => 
 {
   // Get live features
-  const liveExtractor = new FeaturesCls(
-    sampleRate,
-    windowLength,
-    liveAudioData,  
-    windowLength     
-  );
+  const liveExtractor = new FeaturesCls(sampleRate, windowLength);
+  await liveExtractor.populate(liveAudioData, windowLength);
+
   const liveFeatures = liveExtractor.featuregram;
 
   // Define distance function for Offline DTW

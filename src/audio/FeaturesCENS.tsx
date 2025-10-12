@@ -19,17 +19,17 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-import { Features, FeaturesConstructor } from "./features";
-import { NativeModules } from "react-native";
+import { Features } from "./features";
+import { NativeModules, Platform } from "react-native";
 const { fft } = require('fft-js');
 
 let FFTModule: any;
-try {
-    FFTModule = NativeModules.FFTModule;
-    console.log("FFTModule =", FFTModule);
-    console.log("FFTModule.fft =", FFTModule?.fft);
-} catch (e) {
-    console.log("Failed to load FFTModule: ", e);
+if (Platform.OS === "android") {
+    try {
+        FFTModule = NativeModules.FFTModule;
+    } catch (e) {
+        console.log("Failed to load FFTModule: ", e);
+    }
 }
 
 /**
@@ -124,10 +124,6 @@ export function dot(vec1: number[], vec2: number[]): number {
 export class CENSFeatures extends Features<number[]> {
     hanningWindow: number[];
     cFC: number[][];  // conversion matrix from FFT bins to chroma (12) bins
-    
-    constructor(sr: number, winLen: number, audioSamples?: number[], hopLen?: number) {
-        super(sr, winLen, audioSamples, hopLen);
-    }
 
     private ensureHanningWindow() {
         if (this.hanningWindow) return;
@@ -172,7 +168,7 @@ export class CENSFeatures extends Features<number[]> {
      * @param y - audio frame of length n_fft (samples)
      * @returns An array of length 12 representing the CENS chroma features for this frame.
      */
-    makeFeature(y: number[]): number[] {
+    async makeFeature(y: number[]): Promise<number[]> {
         this.ensureHanningWindow();
         
         const n_fft = this.winLen;
@@ -186,7 +182,26 @@ export class CENSFeatures extends Features<number[]> {
         }
         // 2) Compute magnitude spectrum using FFT (real FFT since input is real)
         // Use fft-js to compute FFT. It returns an array of [real, imag] pairs.
-        const phasors = fft(sig);
+
+        let phasors: [number, number][];
+        if (Platform.OS === "android") {
+            try {
+                const fftResult: number[] = await FFTModule.fft(sig);
+                phasors = [[fftResult[0], 0]];
+
+                for (let i = 2; i < fftResult.length; i += 2) {
+                    phasors.push([fftResult[i], fftResult[i + 1]]);
+                }
+
+                phasors.push([fftResult[1], 0])
+            } catch (e) {
+                console.error("Android native fft failed, falling back to JS library", e);
+                phasors = fft(sig);
+            }
+        } else {
+            phasors = fft(sig);
+        }
+
         const num_bins = Math.floor(n_fft / 2) + 1;
         // Take the magnitude (absolute value) of FFT output for bins 0..num_bins-1
         const X: number[] = new Array(num_bins);
@@ -260,6 +275,6 @@ export class CENSFeatures extends Features<number[]> {
     }
 
     cloneEmpty(): this {
-        return new CENSFeatures(this.sr,  this.winLen) as this;
+        return new CENSFeatures(this.sr, this.winLen) as this;
     }
 }

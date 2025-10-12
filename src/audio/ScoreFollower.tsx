@@ -62,13 +62,13 @@ export class ScoreFollower {
    * @param audioFrame Live audio frame
    * @returns Estimated position in the reference audio in seconds
    */
-  step(audioFrame: number[]): number {
+  async step(audioFrame: number[]): Promise<number> {
     if (audioFrame.length < this.winLen) {
       const padding = Array(this.winLen - audioFrame.length).fill(0);
       audioFrame = audioFrame.concat(padding);
     }
 
-    const refIndex = this.otw.insert(audioFrame);
+    const refIndex = await this.otw.insert(audioFrame);
     this.path.push([refIndex, this.otw.liveIdx]);
     return ((refIndex + 1) * this.winLen) / this.sr;
   }
@@ -115,7 +115,8 @@ export class ScoreFollower {
     console.log('-- Building featuregram…');
 
     startTime = new Date();
-    const features = new FeaturesClass(sr, winLen, audioData, hopLen);
+    const features = new FeaturesClass(sr, winLen);
+    await features.populate(audioData, hopLen);
     endTime = new Date();
 
     console.log(`Reference audio feature encoding took ${endTime - startTime}ms`);
