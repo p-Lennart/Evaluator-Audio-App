@@ -120,31 +120,11 @@ export default function ScoreFollowerTest({
 
       const audioData = await prepareAudio(liveFile.uri, sampleRate);
 
-      const startTime = new Date();
-
-      console.log('-- Loading live audio buffer...');
-      buffer = await fetch(liveFile.uri).then(r => r.arrayBuffer()); // Web and mobile version of initializing array buffer given live uri 
-      console.log('-- Buffer loaded, byteLength=', buffer.byteLength);
-
-      console.log('-- Decoding WAV buffer...');
-      const result = await decode(buffer, { symmetric: true }); // Decode the WAV buffer into PCM audio data  - passed in symmetric = TRUE for better PCM samples when compared to the Python version
-      console.log('-- Decoded: channels=', result.channelData.length, 'origSR=', result.sampleRate);
-
-      let audioData = toMono(result.channelData); // Convert these PCM audio data to mono if needed 
-      audioData = resampleAudio(audioData, result.sampleRate, sampleRate) // Resample the resulting audio data if needed
       audioDataRef.current = audioData;
-      console.log('-- Audio data prepared, length=', audioData.length);
-
-      const endTime = new Date();
-
-      console.log(`Loading live audio took ${endTime - startTime}ms`);
-
-      console.log('-- Computing alignment path...');
-      pathRef.current = await precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path 
-      console.log('-- Alignment path length=', pathRef.current.length);
+      console.log("-- Audio data prepared, length=", audioData.length);
 
       console.log("-- Computing alignment path...");
-      pathRef.current = precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
+      pathRef.current = await precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
       console.log("-- Alignment path length=", pathRef.current.length);
 
       // const rawPath = computeOfflineAlignmentPath(refFeatures, audioDataRef.current, FeaturesCls, sr, winLen)
@@ -275,8 +255,8 @@ export default function ScoreFollowerTest({
       );
       soundRef.current = sound;
     } catch (err) {
-      console.error('ScoreFollower Error:', err, err.stack);
-      dispatch({ type: 'start/stop',});
+      console.error("ScoreFollower Error:", err, err.stack);
+      dispatch({ type: "start/stop" });
     }
   };
 

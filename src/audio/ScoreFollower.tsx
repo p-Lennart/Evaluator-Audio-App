@@ -100,44 +100,11 @@ export class ScoreFollower {
 
     const audioData = await prepareAudio(refUri, sr);
 
-    let startTime = new Date();
+    console.log("-- Building featuregram…");
 
-    // Fetch the WAV file as ArrayBuffer
-    const res = await fetch(refUri);
-    if (!res.ok) {
-        throw new Error(`Failed to fetch ${refUri}: ${res.status} ${res.statusText}`);
-    }
-    
-    const arrayBuffer = await res.arrayBuffer();
-
-    console.log('-- Fetched buffer byteLength=', arrayBuffer.byteLength);
-
-    console.log('-- Decoding WAV…');
-    // Decode WAV buffer
-    const result = wav.decode(arrayBuffer);
-    console.log('-- Decoded channels=', result.channelData.length, 'origSR=', result.sampleRate);
-    console.log('-- Converting to mono…');
-
-    // Convert to Mono if needed 
-    let audioData = toMono(result.channelData);
-    console.log(`-- Resampling from ${result.sampleRate} → ${sr}…`);
-
-    // Resample if needed 
-    audioData = resampleAudio(audioData, result.sampleRate, sr)
-    console.log('-- Resampled data length=', audioData.length);
-
-    let endTime = new Date();
-    console.log(`Loading reference audio took ${endTime - startTime}ms`);
-
-    console.log('-- Building featuregram…');
-
-    startTime = new Date();
     const features = new FeaturesClass(sr, winLen);
     await features.populate(audioData, hopLen);
-    endTime = new Date();
-
-    console.log(`Reference audio feature encoding took ${endTime - startTime}ms`);
-    console.log('-- Featuregram length=', features.featuregram.length);
+    console.log("-- Featuregram length=", features.featuregram.length);
 
     return features;
   }
