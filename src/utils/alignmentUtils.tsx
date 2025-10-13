@@ -49,7 +49,8 @@ export const calculateWarpedTimes = (
 
   // Build arrays of path times (seconds)
   const pathTimes = warpingPath.map(
-    ([refIdx, liveIdx]) => [refIdx * stepSize, liveIdx * stepSize] as [number, number],
+    ([refIdx, liveIdx]) =>
+      [refIdx * stepSize, liveIdx * stepSize] as [number, number],
   );
   const refPathTimes = pathTimes.map((p) => p[0]);
   const livePathTimes = pathTimes.map((p) => p[1]);
@@ -66,10 +67,13 @@ export const calculateWarpedTimes = (
     // If query is before or equal first path time, snap to first
     if (q <= refPathTimes[0] + eps) {
       const t = livePathTimes[0];
-      const clamped = (enforceNonDecreasing && warped.length && t < warped[warped.length - 1] - eps)
-        ? warped[warped.length - 1]
-        : t;
-      if (debug) console.log('Q before first path time', q, '->', clamped);
+      const clamped =
+        enforceNonDecreasing &&
+        warped.length &&
+        t < warped[warped.length - 1] - eps
+          ? warped[warped.length - 1]
+          : t;
+      if (debug) console.log("Q before first path time", q, "->", clamped);
       warped.push(clamped);
       continue;
     }
@@ -82,10 +86,13 @@ export const calculateWarpedTimes = (
     // If we've reached the end, snap to last
     if (i >= n - 1) {
       const t = livePathTimes[n - 1];
-      const clamped = (enforceNonDecreasing && warped.length && t < warped[warped.length - 1] - eps)
-        ? warped[warped.length - 1]
-        : t;
-      if (debug) console.log('Q past last path time', q, '->', clamped);
+      const clamped =
+        enforceNonDecreasing &&
+        warped.length &&
+        t < warped[warped.length - 1] - eps
+          ? warped[warped.length - 1]
+          : t;
+      if (debug) console.log("Q past last path time", q, "->", clamped);
       warped.push(clamped);
       continue;
     }
@@ -106,19 +113,39 @@ export const calculateWarpedTimes = (
     if (Math.abs(denom) <= eps) {
       // Plateau in ref axis: find the rightmost index of this plateau and use its live time.
       let plateauRight = rightIdx;
-      while (plateauRight + 1 < n && Math.abs(refPathTimes[plateauRight + 1] - leftRefT) <= eps) {
+      while (
+        plateauRight + 1 < n &&
+        Math.abs(refPathTimes[plateauRight + 1] - leftRefT) <= eps
+      ) {
         plateauRight++;
       }
       tCandidate = livePathTimes[plateauRight];
       if (debug) {
-        console.log('Plateau handling', { q, leftIdx, rightIdx, plateauRight, leftRefT, tCandidate });
+        console.log("Plateau handling", {
+          q,
+          leftIdx,
+          rightIdx,
+          plateauRight,
+          leftRefT,
+          tCandidate,
+        });
       }
     } else {
       // Normal linear interpolation between left and right path points using actual denom
       const frac = (q - leftRefT) / denom;
       tCandidate = leftLiveT + frac * (rightLiveT - leftLiveT);
       if (debug) {
-        console.log('Interp', { q, leftIdx, rightIdx, leftRefT, rightRefT, frac, leftLiveT, rightLiveT, tCandidate });
+        console.log("Interp", {
+          q,
+          leftIdx,
+          rightIdx,
+          leftRefT,
+          rightRefT,
+          frac,
+          leftLiveT,
+          rightLiveT,
+          tCandidate,
+        });
       }
     }
 
@@ -127,7 +154,13 @@ export const calculateWarpedTimes = (
       const prev = warped[warped.length - 1];
       if (tCandidate < prev - eps) {
         if (debug) {
-          console.log('Clamping to preserve monotonicity', { prev, tCandidate, q, leftIdx, rightIdx });
+          console.log("Clamping to preserve monotonicity", {
+            prev,
+            tCandidate,
+            q,
+            leftIdx,
+            rightIdx,
+          });
         }
         tCandidate = prev;
       }
@@ -147,11 +180,11 @@ export const calculateWarpedTimes = (
  * @param follower - Initialized ScoreFollower instance
  * @returns An array of [refFrameIndex, liveFrameIndex] pairs representing the alignment path
  */
-export const precomputeAlignmentPath = (
+export const precomputeAlignmentPath = async (
   audioData: Float32Array,
   frameSize: number,
   follower: ScoreFollower,
-): [number, number][] => {
+): Promise<[number, number][]> => {
   const totalFrames = Math.ceil(audioData.length / frameSize); // Total number of frames we need to process to cover the audio buffer
   console.log(
     `precomputeAlignmentPath: totalFrames = ${totalFrames}, frameSize = ${frameSize}`,
@@ -173,7 +206,7 @@ export const precomputeAlignmentPath = (
     // Step the ScoreFollower with this frame
     // This updates the follower's internal path and returns an estimated time in seconds
     console.log(`    Calling follower.step() on frame ${i}`);
-    const timeSec = follower.step(Array.from(frame));
+    const timeSec = await follower.step(Array.from(frame));
     console.log(`    -- step returned timeSec = ${timeSec.toFixed(3)}s`);
 
     const last = follower.path[follower.path.length - 1] as [number, number]; // Capture the last updated warping step
@@ -199,20 +232,17 @@ export const precomputeAlignmentPath = (
  * @param windowLength - Analysis window size in samples (frame size)
  * @returns Array of index pairs [refFrameIndex, liveFrameIndex] from the DTW alignment
  */
-export const computeOfflineAlignmentPath = (
+export const computeOfflineAlignmentPath = async (
   refFeatures: any,
   liveAudioData: Float32Array,
   FeaturesCls: FeaturesConstructor<any>,
   sampleRate: number,
   windowLength: number,
-): [number, number][] => {
+): Promise<Array<[number, number]>> => {
   // Get live features
-  const liveExtractor = new FeaturesCls(
-    sampleRate,
-    windowLength,
-    liveAudioData,
-    windowLength,
-  );
+  const liveExtractor = new FeaturesCls(sampleRate, windowLength);
+  await liveExtractor.populate(liveAudioData, windowLength);
+
   const liveFeatures = liveExtractor.featuregram;
 
   // Define distance function for Offline DTW

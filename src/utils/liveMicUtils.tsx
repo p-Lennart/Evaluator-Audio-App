@@ -26,11 +26,11 @@ export const initWebAudio = async (
     workletNode.connect(audioCtx.destination); // connect worklet to output
 
     // Handle incoming audio chunks from the worklet
-    workletNode.port.onmessage = (event) => {
+    workletNode.port.onmessage = async (event) => {
       const audioChunk = event.data as number[];
       try {
         // Extract chroma features and update state
-        const chromaResult = chromaMaker.insert(audioChunk);
+        const chromaResult = await chromaMaker.insert(audioChunk);
         setChroma(chromaResult);
       } catch (e) {
         console.error("Chroma extraction error:", e);
@@ -57,9 +57,9 @@ export const initNativeAudio = async (
   try {
     await processor.init(); // ExpoMicProcessor intialization
 
-    processor.onmessage = ({ data }) => {
+    processor.onmessage = async ({ data }) => {
       // Once we get buffer of size 4096
-      const vec = chromaMaker.insert(Array.from(data)); // Insert with ChromaMaker to get chroma vector
+      const vec = await chromaMaker.insert(Array.from(data)); // Insert with ChromaMaker to get chroma vector
       setChroma(vec); // Set chroma vector
     };
 

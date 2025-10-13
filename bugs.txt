@@ -1,0 +1,6 @@
+- score keeps scrolling to the top
+- top bar overlaps with system ui
+- notes are smooshed together when phone is vertical
+
+- crashes after hitting play
+- crashes after finishing playing

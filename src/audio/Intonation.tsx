@@ -10,7 +10,7 @@ const AGGREGATE_DIVISOR = 2;
 const AGGREGATE_DEFAULT_SIZE = 10;
 
 const COLOR_NEUTRAL = "#000000";
-const COLOR_SHARP = "#00ff00"
+const COLOR_SHARP = "#00ff00";
 const COLOR_FLAT = "#ff0000";
 
 const MISTAKE_THRESHOLD = 0.5;

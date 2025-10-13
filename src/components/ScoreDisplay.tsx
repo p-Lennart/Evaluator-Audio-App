@@ -141,7 +141,6 @@ export default function ScoreDisplay({
     ); // Initializes osdRef and cursorRef
   }, [dispatch, state.score, state.scores]);
 
-
   const baseXml =
     (state.scoreContents && state.scoreContents[state.score]) ||
     scoresData[state.score] ||
@@ -151,7 +150,7 @@ export default function ScoreDisplay({
   useEffect(() => {
     const osmd = osdRef.current;
     if (!osmd) return;
-    
+
     if (!state.noteColors || state.noteColors.length === 0) {
       // clear colors if want to reset: applyNoteColors(osmd, []);
       return;

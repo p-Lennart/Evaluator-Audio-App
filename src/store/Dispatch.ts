@@ -86,7 +86,7 @@ const reducer_function = (state: any, action: any) => {
         estimatedPitch: action.payload as number,
       };
 
-    case "SET_NOTE_COLORS": 
+    case "SET_NOTE_COLORS":
       console.log("[reducer] # of note colors:", action.payload.length);
       return {
         ...state,
