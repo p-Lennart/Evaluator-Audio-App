@@ -20,12 +20,16 @@ import {
   pickMobileWavFile,
 } from "../utils/fileSelectorUtils";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
-import { 
-  getScoreRefAudio, 
+import {
+  getScoreRefAudio,
   getScoreCSVData,
-  unifiedScoreMap 
-} from "../score_name_to_data_map/unifiedScoreMap"
-import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
+  unifiedScoreMap,
+} from "../score_name_to_data_map/unifiedScoreMap";
+import {
+  calculateIntonation,
+  intonationToNoteColor,
+  testIntonation,
+} from "../audio/Intonation";
 import { NoteColor } from "../utils/musicXmlUtils";
 
 interface ScoreFollowerTestProps {
@@ -124,7 +128,11 @@ export default function ScoreFollowerTest({
       console.log("-- Audio data prepared, length=", audioData.length);
 
       console.log("-- Computing alignment path...");
-      pathRef.current = await precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
+      pathRef.current = await precomputeAlignmentPath(
+        audioData,
+        frameSize,
+        follower,
+      ); // Compute alignment path
       console.log("-- Alignment path length=", pathRef.current.length);
 
       // const rawPath = computeOfflineAlignmentPath(refFeatures, audioDataRef.current, FeaturesCls, sr, winLen)
@@ -194,7 +202,10 @@ export default function ScoreFollowerTest({
           intonation: intonation[i],
         }));
 
-        console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
+        console.log(
+          `New table with (win, hop) (${intonationParams}):`,
+          newTable,
+        );
       }
 
       console.log(pathRef.current); // Show full path
@@ -214,19 +225,22 @@ export default function ScoreFollowerTest({
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
-          
+
           if (iterations % 10 == 0) {
-            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current);
-            
+            const intonationChunk = csvDataRef.current.slice(
+              0,
+              nextIndexRef.current,
+            );
+
             const noteColors: NoteColor[] = intonationChunk.map((row, idx) => {
               return intonationToNoteColor(row.intonation, 0 + idx);
             });
 
             dispatch({
-                type: "SET_NOTE_COLORS",
-                payload: noteColors,
+              type: "SET_NOTE_COLORS",
+              payload: noteColors,
             });
-          } 
+          }
 
           nextIndexRef.current++; // Go to next row of csv
         }

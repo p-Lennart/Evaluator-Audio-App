@@ -25,20 +25,19 @@ export const initWebAudio = async (
     source.connect(workletNode); // Connect the mic source to the worklet
     workletNode.connect(audioCtx.destination); // connect worklet to output
 
-
-  // Handle incoming audio chunks from the worklet
-  workletNode.port.onmessage = async(event) => {
-    const audioChunk = event.data as number[];
-    try {
-      // Extract chroma features and update state
-      const chromaResult = await chromaMaker.insert(audioChunk);
-      setChroma(chromaResult);
-    } catch (e) {
-      console.error('Chroma extraction error:', e);
-    }
-  };
+    // Handle incoming audio chunks from the worklet
+    workletNode.port.onmessage = async (event) => {
+      const audioChunk = event.data as number[];
+      try {
+        // Extract chroma features and update state
+        const chromaResult = await chromaMaker.insert(audioChunk);
+        setChroma(chromaResult);
+      } catch (e) {
+        console.error("Chroma extraction error:", e);
+      }
+    };
   } catch (err) {
-    console.error('Failed to initialize audio:', err);
+    console.error("Failed to initialize audio:", err);
   }
 };
 
@@ -58,12 +57,13 @@ export const initNativeAudio = async (
   try {
     await processor.init(); // ExpoMicProcessor intialization
 
-    processor.onmessage = async({ data }) => { // Once we get buffer of size 4096
-      const vec = await chromaMaker.insert(Array.from(data));  // Insert with ChromaMaker to get chroma vector
+    processor.onmessage = async ({ data }) => {
+      // Once we get buffer of size 4096
+      const vec = await chromaMaker.insert(Array.from(data)); // Insert with ChromaMaker to get chroma vector
       setChroma(vec); // Set chroma vector
     };
 
-    await processor.start(); // Start recording 
+    await processor.start(); // Start recording
   } catch (err) {
     console.error("Failed to initialize Native audio:", err);
   }

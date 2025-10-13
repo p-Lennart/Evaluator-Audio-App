@@ -1,5 +1,10 @@
 import { extractTempo } from "./fileSelectorUtils";
-import { OpenSheetMusicDisplay, Cursor, Fraction, GraphicalNote } from "opensheetmusicdisplay";
+import {
+  OpenSheetMusicDisplay,
+  Cursor,
+  Fraction,
+  GraphicalNote,
+} from "opensheetmusicdisplay";
 import { Platform } from "react-native";
 import scoresData from "../score_name_to_data_map/scoreToMusicxmlMap";
 
@@ -164,7 +169,7 @@ export const peekAtCurrentBeat = (
   return delta;
 };
 
-// Match music21 flatten().notes generated csvs: no rests, all notes (normal, tied, grace) 
+// Match music21 flatten().notes generated csvs: no rests, all notes (normal, tied, grace)
 export function getAllGraphicalNotes(osmd: any): any[] {
   const notes: any[] = [];
   const sheet = osmd.GraphicSheet;
@@ -188,7 +193,10 @@ export function getAllGraphicalNotes(osmd: any): any[] {
   return notes;
 }
 
-export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; color: string }>) {
+export function applyNoteColors(
+  osmd: any,
+  noteColors: Array<{ index: number; color: string }>,
+) {
   if (!osmd) return;
 
   const allNotes = getAllGraphicalNotes(osmd);
@@ -196,7 +204,7 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
 
   // fast lookup map from index -> color
   const colorMap = new Map<number, string>();
-  (noteColors || []).forEach(n => colorMap.set(n.index, n.color));
+  (noteColors || []).forEach((n) => colorMap.set(n.index, n.color));
 
   // Clear previous colors for notes not in map
   // allNotes.forEach((gNote) => {
@@ -231,7 +239,10 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
           vf.setStyle({ fillStyle: color, strokeStyle: color });
         } else if (typeof vf.setAttribute === "function") {
           // Not common, but harmless if present
-          try { vf.setAttribute("fill", color); vf.setAttribute("stroke", color); } catch (e) {}
+          try {
+            vf.setAttribute("fill", color);
+            vf.setAttribute("stroke", color);
+          } catch (e) {}
         } else if (vf.attrs && typeof vf.attrs === "object") {
           // Some VexFlow renderers expose attrs
           vf.attrs.fill = color;
@@ -243,7 +254,6 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
           // If nothing matches, we do nothing to vfnote — rely on sourceNote change above.
         }
       }
-
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn("applyNoteColors: failed for index", idx, err);
@@ -257,7 +267,6 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
     console.error("osmd.render() failed", e);
   }
 }
-
 
 /**
  * Builds the complete HTML string for rendering OSMD inside a **React Native WebView**.

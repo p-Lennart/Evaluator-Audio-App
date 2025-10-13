@@ -7,13 +7,15 @@ export type NoteColor = {
 
 export function colorNotesInMusicXML(
   musicXML: string,
-  noteIndicesToColor: NoteColor[]
+  noteIndicesToColor: NoteColor[],
 ): string {
   // Extract XML declaration and DOCTYPE
   const xmlDeclMatch = musicXML.match(/<\?xml.*?\?>/);
   const doctypeMatch = musicXML.match(/<!DOCTYPE.*?>/);
 
-  const xmlDecl = xmlDeclMatch ? xmlDeclMatch[0] : '<?xml version="1.0" encoding="UTF-8"?>';
+  const xmlDecl = xmlDeclMatch
+    ? xmlDeclMatch[0]
+    : '<?xml version="1.0" encoding="UTF-8"?>';
   const doctype = doctypeMatch
     ? doctypeMatch[0]
     : '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">';
@@ -24,10 +26,7 @@ export function colorNotesInMusicXML(
   return `${xmlDecl}\n${doctype}\n${innerXml}`;
 }
 
-function colorNotesInnerXML(
-  musicXML: string,
-  noteIndicesToColor: NoteColor[]
-) {
+function colorNotesInnerXML(musicXML: string, noteIndicesToColor: NoteColor[]) {
   // Parse XML into a mutable fragment
   const doc: XMLBuilder = fragment(musicXML);
 
