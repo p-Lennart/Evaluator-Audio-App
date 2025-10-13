@@ -1,3 +1,6 @@
+import { Asset } from "expo-asset";
+import { File } from "expo-file-system";
+
 /**
  * Represents a single row of tempo CSV data.
  */
@@ -43,7 +46,17 @@ export const parseCsv = (text: string): CSVRow[] => {
  * @returns Promise resolving to an array of CSVRow
  */
 export const loadCsvInfo = async (csvUri: string): Promise<CSVRow[]> => {
-  let text: string;
-  text = await fetch(csvUri).then((r) => r.text()); // Fetch the CSV file content as plain text
+  const asset = Asset.fromModule(csvUri);
+
+  if (!asset.localUri) {
+    console.log("Downloading csv...");
+    await asset.downloadAsync();
+  }
+
+  console.assert(asset.localUri, `Failed to fetch csv file with uri '${csvUri}'`);
+
+  const file = new File(asset.localUri);
+
+  const text: string = await file.text();
   return parseCsv(text); // Parse the CSV text into structured data
 };

@@ -1,3 +1,5 @@
+import { Asset } from "expo-asset";
+import { File } from "expo-file-system";
 import waveResampler from "wave-resampler";
 const wav = require("node-wav");
 
@@ -123,14 +125,18 @@ export function pythonFormat(v: number): string {
 
 export async function prepareAudio(fileUri: string, sampleRate: number) {
   // Fetch the WAV file as ArrayBuffer
-  const res = await fetch(fileUri);
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch ${fileUri}: ${res.status} ${res.statusText}`,
-    );
+  const asset = Asset.fromModule(fileUri);
+
+  if (!asset.localUri) {
+    console.log("Downloading audio...");
+    await asset.downloadAsync();
   }
 
-  const arrayBuffer = await res.arrayBuffer();
+  console.assert(asset.localUri, `Failed to fetch file with uri '${fileUri}'`);
+
+  const file = new File(asset.localUri);
+
+  const arrayBuffer = await file.arrayBuffer();
 
   console.log("-- Fetched buffer byteLength=", arrayBuffer.byteLength);
 
