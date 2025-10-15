@@ -49,6 +49,7 @@ import {
 } from "../score_name_to_data_map/unifiedScoreMap";
 
 import { calculateIntonation, testIntonation } from "../audio/Intonation";
+import { getCurrentUser, savePerformanceData, PerformanceData } from "../utils/accountUtils";
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
@@ -78,6 +79,7 @@ export default function ScoreFollowerTest({
   const [frameSize, setFrameSize] = useState<number>(0); // State to store frame size of score follower
   const [sampleRate, setSampleRate] = useState<number>(0); // State to store sample rate of score follower
   const [performanceComplete, setPerformanceComplete] = useState(false); // State to determine if plackback of a score is finished or not
+  const [performanceSaved, setPerformanceSaved] = useState(false); // State to track if performance has been saved
   const isWeb = Platform.OS === "web"; // Boolean indicating if user is on website version or not
 
   // Unload the sound when the component unmounts to free up memory
@@ -110,10 +112,35 @@ export default function ScoreFollowerTest({
     await testIntonation(audioUri, csvUri, 44100);
   };
 
+  const saveCurrentPerformance = async () => {
+    const user = await getCurrentUser();
+    if (!user) {
+      console.log('No user logged in');
+      alert('Please log in to save performance data');
+      return;
+    }
+
+    const performanceData: PerformanceData = {
+      id: Date.now().toString(),
+      scoreName: score || 'unknown',
+      timestamp: new Date().toISOString(),
+      intonationData: csvDataRef.current.map(row => row.intonation || 0),
+      csvData: csvDataRef.current,
+      warpingPath: pathRef.current,
+      tempo: bpm,
+    };
+
+    await savePerformanceData(performanceData);
+    setPerformanceSaved(true);
+    console.log('Performance saved successfully');
+    alert('Performance saved successfully!');
+  };
+
   const runFollower = async () => {
     if (!score) return; // Do nothing if no score is selected
 
     const base = score.replace(/\.musicxml$/, ""); // Retrieve score name (".musicxml" removal)
+    setPerformanceSaved(false); // Reset saved state when starting new performance
 
     // These booleans are mainly used to disable certain features at certain times
     dispatch({ type: "start/stop" }); // Toggle playing boolean (to true in this case)
@@ -146,6 +173,8 @@ export default function ScoreFollowerTest({
       console.log("-- Audio data prepared, length=", audioData.length);
 
       console.log("-- Computing alignment path...");
+      console.log("   Live audio URI:", liveFile.uri);
+      console.log("   Ref audio URI:", refUri);
       pathRef.current = precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
       console.log("-- Alignment path length=", pathRef.current.length);
 
@@ -183,6 +212,10 @@ export default function ScoreFollowerTest({
         */
        
         const predictedTimes = refTimes;
+        console.log("PERFECT TIMES ENABLED: predictedTimes === refTimes");
+        console.log("   First 5 refTimes:", refTimes.slice(0, 5));
+        console.log("   First 5 predictedTimes:", predictedTimes.slice(0, 5));
+        console.log("   Are they equal?", JSON.stringify(refTimes) === JSON.stringify(predictedTimes));
 
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
@@ -192,22 +225,22 @@ export default function ScoreFollowerTest({
 
         console.log("New table", csvDataRef.current);
 
-        // const scorePitchesCol = csvDataRef.current.map((r) => r.midi);
-        // const intonationParams = [1024, 512];
-        // const intonation = calculateIntonation(
-        //   audioData,
-        //   scorePitchesCol,
-        //   predictedTimes,
-        //   sr,
-        //   intonationParams[0],
-        //   intonationParams[1],
-        // );
+        const scorePitchesCol = csvDataRef.current.map((r) => r.midi);
+        const intonationParams = [1024, 512];
+        const intonation = calculateIntonation(
+          audioData,
+          scorePitchesCol,
+          predictedTimes,
+          sr,
+          intonationParams[0],
+          intonationParams[1],
+        );
 
-        // // Update CSV struct arr with intonation values for each note
-        // csvDataRef.current = csvDataRef.current.map((row, i) => ({
-        //   ...row,
-        //   intonation: intonation[i],
-        // }));
+        // Update CSV struct arr with intonation values for each note
+        csvDataRef.current = csvDataRef.current.map((row, i) => ({
+          ...row,
+          intonation: intonation[i],
+        }));
       }
 
       console.log(pathRef.current); // Show full path
@@ -234,8 +267,17 @@ export default function ScoreFollowerTest({
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
           const pitch = csvDataRef.current[nextIndexRef.current].intonation; // Get beat of that note
-          const actualDelay = currentTimeSec - csvDataRef.current[nextIndexRef.current].predictedTime;
-          console.log(`Cursor Dispatch: Beat ${beat} dispatched with ${(actualDelay * 1000).toFixed(1)}ms delay`);
+          const predictedTime = csvDataRef.current[nextIndexRef.current].predictedTime;
+          const actualDelay = currentTimeSec - predictedTime;
+          const dispatchTimestamp = performance.now();
+          
+          // Cross-component access
+          (window as any).__lastDispatchTime = dispatchTimestamp;
+          (window as any).__lastBeatDispatched = beat;
+          (window as any).__lastPredictedTime = predictedTime;
+          (window as any).__lastAudioTime = currentTimeSec;
+          
+          console.log(`[TIMING] Dispatch Start: Beat ${beat}, Audio time=${currentTimeSec.toFixed(3)}s, Predicted=${predictedTime.toFixed(3)}s, Delay=${(actualDelay * 1000).toFixed(1)}ms, Timestamp=${dispatchTimestamp.toFixed(2)}ms`);
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
           // dispatch({ type: "SET_ESTIMATED_PITCH", payload: pitch });
           nextIndexRef.current++; // Go to next row of csv
@@ -366,6 +408,21 @@ export default function ScoreFollowerTest({
           {state.playing ? "Running..." : "Play"}
         </Text>
       </TouchableOpacity>
+
+      {/* Save Performance button */}
+      <TouchableOpacity
+        style={[
+          styles.button,
+          styles.saveButton,
+          (!performanceComplete || performanceSaved) && styles.disabledButton,
+        ]}
+        onPress={saveCurrentPerformance}
+        disabled={!performanceComplete || performanceSaved}
+      >
+        <Text style={styles.buttonText}>
+          {performanceSaved ? "Performance Saved ✓" : "Save Performance"}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -377,6 +434,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C3E50",
     borderRadius: 8,
     alignItems: "center",
+  },
+  saveButton: {
+    marginTop: 8,
+    backgroundColor: "#27AE60",
   },
   disabledButton: {
     backgroundColor: "#555",
