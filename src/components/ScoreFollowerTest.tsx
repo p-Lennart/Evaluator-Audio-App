@@ -166,7 +166,7 @@ export default function ScoreFollowerTest({
         const intonation = calculateIntonation(
           audioData,
           scorePitchesCol,
-          refTimes,
+          predictedTimes,
           sr,
           intonationParams[0],
           intonationParams[1],
