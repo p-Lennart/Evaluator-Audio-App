@@ -1,12 +1,19 @@
 import { PitchDetector } from "pitchy";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import { prepareAudio } from "../utils/audioUtils";
+import { NoteColor } from "../utils/musicXmlUtils";
 
 const OCTAVE_OFF_THRESHOLD = 2;
 const SEMITONE_THRESHOLD = 2;
 
 const AGGREGATE_DIVISOR = 2;
 const AGGREGATE_DEFAULT_SIZE = 10;
+
+const COLOR_NEUTRAL = "#000000";
+const COLOR_SHARP = "#00ff00"
+const COLOR_FLAT = "#ff0000";
+
+const MISTAKE_THRESHOLD = 0.5;
 
 function windowNumPerTs(
   timestamps: number[],
@@ -144,7 +151,7 @@ function estimatePitchesAtTimestamps(
         diff = diff % 12;
       }
 
-      if (diff > SEMITONE_THRESHOLD) return undefined;
+      if (Math.abs(diff) > SEMITONE_THRESHOLD) return undefined;
       return diff;
     });
 
@@ -155,8 +162,8 @@ function estimatePitchesAtTimestamps(
     if (logging) {
       console.log(
         `Pitch #${idx}: Window num: ${windowNum} -> Direct Pitch: ${directPitch}`,
+        // console.log(`Median ${pitchEstimate}, Aggr ${diffAggregate}`);
       );
-      // console.log(`Median ${pitchEstimate}, Aggr ${diffAggregate}`);
       console.log(`... Aggregate length ${aggregateSize}`);
       console.log(`Score Pitch: `, scorePitch);
     }
@@ -185,7 +192,7 @@ export function calculateIntonation(
     audioPitches,
     sampleRate,
     hopLen,
-    true,
+    false,
   );
 }
 
@@ -222,4 +229,17 @@ export async function testIntonation(
   }));
 
   console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
+}
+
+export function intonationToNoteColor(intonation: number, noteIdx: number) {
+  let color: string;
+  if (Math.abs(intonation) < MISTAKE_THRESHOLD) {
+    color = COLOR_NEUTRAL;
+  } else if (intonation > 0) {
+    color = COLOR_SHARP;
+  } else {
+    color = COLOR_FLAT;
+  }
+
+  return { index: noteIdx, color: color };
 }

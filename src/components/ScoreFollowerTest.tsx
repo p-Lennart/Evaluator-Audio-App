@@ -1,29 +1,7 @@
-// # The MIT License (MIT)
-
-// Copyright (c) 2016 PART <info@gordonlesti.com>, <https://fheyen.github.io/>
-
-// > Permission is hereby granted, free of charge, to any person obtaining a copy
-// > of this software and associated documentation files (the "Software"), to deal
-// > in the Software without restriction, including without limitation the rights
-// > to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// > copies of the Software, and to permit persons to whom the Software is
-// > furnished to do so, subject to the following conditions:
-// >
-// > The above copyright notice and this permission notice shall be included in
-// > all copies or substantial portions of the Software.
-// >
-// > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// > IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// > FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// > THE SOFTWARE.
-
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Audio, AVPlaybackStatus } from "expo-av";
-import { decode } from "wav-decoder";
+
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { CENSFeatures } from "../audio/FeaturesCENS";
 import { FeaturesConstructor } from "../audio/Features";
@@ -48,8 +26,9 @@ import {
   unifiedScoreMap 
 } from "../score_name_to_data_map/unifiedScoreMap";
 
-import { calculateIntonation, testIntonation } from "../audio/Intonation";
 import { getCurrentUser, savePerformanceData, PerformanceData } from "../utils/accountUtils";
+import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
+import { NoteColor } from "../utils/musicXmlUtils";
 
 interface ScoreFollowerTestProps {
   score: string; // Selected score name
@@ -236,11 +215,29 @@ export default function ScoreFollowerTest({
           intonationParams[1],
         );
 
+        // Debug sequence: tiled flat-neutral-sharp
+        // let debugTmp = intonation;
+        // debugTmp = debugTmp.map( (el, idx) => (idx % 3) - 1);
+
+        // console.log("Debug tmp", debugTmp);
+        // dispatch({
+        //   type: "SET_NOTE_COLORS",
+        //   payload: intonationToColors(debugTmp)
+        // });
+
         // Update CSV struct arr with intonation values for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
           ...row,
           intonation: intonation[i],
         }));
+
+        const newTable = csvDataRef.current.map((row, i) => ({
+          time: row.refTime,
+          midi: row.midi,
+          intonation: intonation[i],
+        }));
+
+        console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
       }
 
       console.log(pathRef.current); // Show full path
@@ -251,14 +248,7 @@ export default function ScoreFollowerTest({
         if (!status.isLoaded) return; // Exit early if sound isn't loaded
         const currentTimeSec = status.positionMillis / 1000; // Convert current playback time from milliseconds to seconds
 
-        // Console logging for cursor dispatch analysis : COMMENTED OUT
-        // if (nextIndexRef.current < csvDataRef.current.length) {
-        //   const nextNote = csvDataRef.current[nextIndexRef.current];
-        //   const timeDiff = currentTimeSec - nextNote.predictedTime;
-        //   const willDispatch = currentTimeSec >= nextNote.predictedTime;
-        //   console.log(`Dispatch Timing: Audio=${currentTimeSec.toFixed(3)}s, Predicted=${nextNote.predictedTime.toFixed(3)}s, Diff=${timeDiff.toFixed(3)}s, Beat=${nextNote.beat}`);
-        // }
-
+        let iterations = 0;
         while (
           // Process only if the frame is within bounds and we have passed a predicted time of current csv row
           nextIndexRef.current < csvDataRef.current.length &&
@@ -266,20 +256,21 @@ export default function ScoreFollowerTest({
             csvDataRef.current[nextIndexRef.current].predictedTime
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
-          const pitch = csvDataRef.current[nextIndexRef.current].intonation; // Get beat of that note
-          const predictedTime = csvDataRef.current[nextIndexRef.current].predictedTime;
-          const actualDelay = currentTimeSec - predictedTime;
-          const dispatchTimestamp = performance.now();
-          
-          // Cross-component access
-          (window as any).__lastDispatchTime = dispatchTimestamp;
-          (window as any).__lastBeatDispatched = beat;
-          (window as any).__lastPredictedTime = predictedTime;
-          (window as any).__lastAudioTime = currentTimeSec;
-          
-          console.log(`[TIMING] Dispatch Start: Beat ${beat}, Audio time=${currentTimeSec.toFixed(3)}s, Predicted=${predictedTime.toFixed(3)}s, Delay=${(actualDelay * 1000).toFixed(1)}ms, Timestamp=${dispatchTimestamp.toFixed(2)}ms`);
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
-          // dispatch({ type: "SET_ESTIMATED_PITCH", payload: pitch });
+          
+          if (iterations % 10 == 0) {
+            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current);
+            
+            const noteColors: NoteColor[] = intonationChunk.map((row, idx) => {
+              return intonationToNoteColor(row.intonation, 0 + idx);
+            });
+
+            dispatch({
+                type: "SET_NOTE_COLORS",
+                payload: noteColors,
+            });
+          } 
+
           nextIndexRef.current++; // Go to next row of csv
         }
 

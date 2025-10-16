@@ -13,6 +13,7 @@ import scoresData from "../score_name_to_data_map/scoreToMusicxmlMap"; // Local 
 import { WebView } from "react-native-webview";
 import {
   advanceToNextBeat,
+  applyNoteColors,
   buildOsmdHtmlForNative,
   initOsmdWeb,
   onHandleOsmdMessageForNative,
@@ -79,7 +80,7 @@ export default function ScoreDisplay({
       ); // Intialbeats = beat value of the current note that the cursor is on
     }
     movedBeats.current = initialBeats; // This is accounting for the first note that the cursor highlights at the beginning
-    console.log("movedBeats :", movedBeats);
+    // console.log("movedBeats :", movedBeats);
 
     // Calculate how many beats we need to move forward
     const toMove = Math.max(0, targetBeats);
@@ -157,28 +158,6 @@ export default function ScoreDisplay({
     moveCursorByBeats(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 
-  // Note coloring effect
-  useEffect(() => {
-    if (typeof state.estimatedPitch !== "number") return;
-    if (!osdRef.current || !cursorRef.current) return;
-
-    const instruments = osdRef.current.Sheet.Instruments;
-    const voices = cursorRef.current.VoicesUnderCursor(instruments[0]);
-    if (voices.length && voices[0].Notes.length) {
-      const note = voices[0].Notes[0];
-
-      console.log("Coloring by estimated pitch: ", state.estimatedPitch);
-      if (state.estimatedPitch < 0) {
-        note.NoteheadColor = "#FF0000";
-      } else if (state.estimatedPitch > 0) {
-        note.NoteheadColor = "#00FF00";
-      } else {
-        note.NoteheadColor = "#000000";
-      }
-      osdRef.current.render(); // refresh sheet with coloring applied
-    }
-  }, [state.estimatedBeat, state.estimatedPitch]);
-
   // Web-only initialization
   useEffect(() => {
     initOsmdWeb(
@@ -191,10 +170,24 @@ export default function ScoreDisplay({
     ); // Initializes osdRef and cursorRef
   }, [dispatch, state.score, state.scores]);
 
-  const selectedXml =
+
+  const baseXml =
     (state.scoreContents && state.scoreContents[state.score]) ||
     scoresData[state.score] ||
     ""; // Get selected xml data from given the current score's name
+
+  // Runtime refresh
+  useEffect(() => {
+    const osmd = osdRef.current;
+    if (!osmd) return;
+    
+    if (!state.noteColors || state.noteColors.length === 0) {
+      // clear colors if want to reset: applyNoteColors(osmd, []);
+      return;
+    }
+
+    applyNoteColors(osmd, state.noteColors);
+  }, [state.noteColors]);
 
   return (
     <>
@@ -233,7 +226,7 @@ export default function ScoreDisplay({
           <WebView
             ref={webviewRef}
             originWhitelist={["*"]}
-            source={{ html: buildOsmdHtmlForNative(selectedXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
+            source={{ html: buildOsmdHtmlForNative(baseXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
             onMessage={(e) =>
               onHandleOsmdMessageForNative(e.nativeEvent.data, dispatch)
             } // Call function when page inside this Webview calls postMessage
