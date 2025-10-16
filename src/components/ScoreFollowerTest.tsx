@@ -247,6 +247,18 @@ export default function ScoreFollowerTest({
     }
   };
 
+  // console.log("--- TempoGraph Debugger ---");
+  // console.log("refTempo (bpm):", bpm);
+  // console.log("beatsPerMeasure:", state.beatsPerMeasure);
+  // console.log("warpingPath length:", warpingPath.length);
+  // console.log("warpingPath first 5:", warpingPath.slice(0, 5));
+  // console.log("warpingPath last 5:", warpingPath.slice(-5));
+  // console.log("scoreName:", score.replace(/\.musicxml$/, ""));
+  // console.log("frameSize:", frameSize);
+  // console.log("sampleRate:", sampleRate);
+  // console.log("disabled:", !performanceComplete || liveFile == null);
+  // console.log("--------------------------");
+
   return (
     <View>
       {/* Show tempo of selected score to be played */}
@@ -398,7 +410,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C3E50",
     borderRadius: 8,
     alignItems: "center",
-    marginBottom: 8,
+    // marginBottom: 8,
     // optional hard cap to be safer:
     maxWidth: 220,
   },

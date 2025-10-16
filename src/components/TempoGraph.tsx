@@ -52,7 +52,7 @@ const TempoGraph: React.FC<TempoGraphProps> = ({
         const refBeats = (refTimeSec * refTempo) / 60; // Convert ref time into ref beats
         return { refBeats, liveTimeSec }; // Return ref beat paired with respective live time
       }),
-    [warpingPath, refTempo],
+    [warpingPath, refTempo]
   );
 
   // Interpolate -> exact event time per integer beat

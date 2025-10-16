@@ -43,7 +43,7 @@ export function MissingExtraIndicator() {
   // Compare pitch counts
   const compareNoteCounts = (
     refCounts: Record<string, number>,
-    perfCounts: Record<string, number>,
+    perfCounts: Record<string, number>
   ) => {
     const allPitches = new Set([
       ...Object.keys(refCounts),
@@ -105,7 +105,7 @@ export function MissingExtraIndicator() {
 
       setResult(
         `Missing Notes:\n${missing.length ? missing.join("\n") : "None"}\n\n` +
-          `Extra Notes:\n${extra.length ? extra.join("\n") : "None"}`,
+          `Extra Notes:\n${extra.length ? extra.join("\n") : "None"}`
       );
     } catch (err) {
       console.error(err);
