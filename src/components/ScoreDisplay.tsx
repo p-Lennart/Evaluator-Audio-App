@@ -96,16 +96,7 @@ export default function ScoreDisplay({
         const leftover = moved - toMove;
         overshootBeats.current = leftover;
         movedBeats.current = toMove;
-        
-        const renderStart = performance.now();
-        osdRef.current!.render(); // Re-render
-        const renderEnd = performance.now();
-        const renderDuration = renderEnd - renderStart;
-        
-        const moveStartTime = (window as any).__lastMoveStartTime;
-        const totalOsmdLag = moveStartTime ? renderEnd - moveStartTime : null;
-        
-        console.log(`[TIMING] OSMD Render Complete (FINAL): Beat ${toMove}, Render duration=${renderDuration.toFixed(2)}ms, Total OSMD lag=${totalOsmdLag ? totalOsmdLag.toFixed(2) : 'N/A'}ms`);
+        osdRef.current!.render(); // Re-render the music sheet
         return;
       }
 
@@ -119,13 +110,7 @@ export default function ScoreDisplay({
       moved += delta; // Accumulate the moved beats
       movedBeats.current = moved; // Update reference
 
-      const renderStart = performance.now();
-      osdRef.current!.render();
-      const renderEnd = performance.now();
-      const renderDuration = renderEnd - renderStart;
-      
-      console.log(`[TIMING] OSMD Render (STEP): Beat ${moved.toFixed(2)}, Render duration=${renderDuration.toFixed(2)}ms`);
-      
+      osdRef.current!.render(); // Re-render to reflect the cursor's new position
       animRef.current = requestAnimationFrame(stepFn); // Schedule a new animation frame and store its ID (better alternative to setTimeout)
     };
     stepFn(); // Start the step loop
@@ -135,26 +120,12 @@ export default function ScoreDisplay({
   useEffect(() => {
     const beat = state.estimatedBeat; // Get beat from global state
     if (typeof beat !== "number") return; // Only proceed if beat is valid
-    
-    const receiveTimestamp = performance.now();
-    const dispatchTimestamp = (window as any).__lastDispatchTime;
-    const dispatchLag = dispatchTimestamp ? receiveTimestamp - dispatchTimestamp : null;
-    
-    console.log(`[TIMING] Dispatch Received: Beat ${beat}, Receive time=${receiveTimestamp.toFixed(2)}ms, Dispatch lag=${dispatchLag ? dispatchLag.toFixed(2) : 'N/A'}ms`);
-    
     setSteps(String(beat)); // Update step state (beat value we are trying to move the cursor to)
   }, [state.estimatedBeat]); // Queue when global beat value changes
 
   // Chained cursor movement effect
   useEffect(() => {
     if (steps === "") return; // Chained useeffect to have steps state updated properly before running the cursor movement logic
-    
-    const moveStartTimestamp = performance.now();
-    const receiveTimestamp = (window as any).__lastDispatchTime ? (window as any).__lastDispatchTime + ((window as any).__lastDispatchLag || 0) : null;
-    
-    console.log(`[TIMING] Move Cursor Start: Beat ${steps}, Start time=${moveStartTimestamp.toFixed(2)}ms`);
-    (window as any).__lastMoveStartTime = moveStartTimestamp;
-    
     moveCursorByBeats(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 

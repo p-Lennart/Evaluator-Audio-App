@@ -43,13 +43,8 @@ export const calculateWarpedTimes = (
   stepSize: number,
   refTimes: number[],
   enforceNonDecreasing = true,
-  debug = false,
-  usePerfectTimestamps = false, 
+  debug = false
 ): number[] => {
-  // Return reference times directly 
-  if (usePerfectTimestamps) {
-    return [...refTimes];
-  }
   if (!warpingPath || warpingPath.length === 0) return refTimes.map(() => 0);
 
   // Build arrays of path times (seconds)

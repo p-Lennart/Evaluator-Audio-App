@@ -178,23 +178,14 @@ export default function ScoreFollowerTest({
         const warpingPath = pathRef.current; // The Dynamic Time Warping path: an array of [referenceIndex, liveIndex] pairs
         const refTimes = csvDataRef.current.map((r) => r.refTime); // Pull out just the reference times from each row to feed into the calculateWarpedTimes()
 
-        /*
         const predictedTimes = calculateWarpedTimes(
           // Obtain array of ESTIMATED timestamps of when each note is played in the live audio
           warpingPath,
           stepSize,
           refTimes,
           true,
-          false,
-          false, // Turn off perfect timestamps for normal operation
+          false
         );
-        */
-       
-        const predictedTimes = refTimes;
-        console.log("PERFECT TIMES ENABLED: predictedTimes === refTimes");
-        console.log("   First 5 refTimes:", refTimes.slice(0, 5));
-        console.log("   First 5 predictedTimes:", predictedTimes.slice(0, 5));
-        console.log("   Are they equal?", JSON.stringify(refTimes) === JSON.stringify(predictedTimes));
 
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
@@ -284,7 +275,7 @@ export default function ScoreFollowerTest({
         }
       };
 
-      const soundSource = { uri: refUri };
+      const soundSource = { uri: liveFile.uri };
       dispatch({ type: "toggle_loading_performance" }); // Toggle loading boolean (to false in this case)
 
       // Create and load the sound object from the live audio URI
