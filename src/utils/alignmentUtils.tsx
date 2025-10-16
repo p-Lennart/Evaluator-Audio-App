@@ -43,7 +43,7 @@ export const calculateWarpedTimes = (
   stepSize: number,
   refTimes: number[],
   enforceNonDecreasing = true,
-  debug = false,
+  debug = false
 ): number[] => {
   if (!warpingPath || warpingPath.length === 0) return refTimes.map(() => 0);
 
