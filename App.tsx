@@ -17,7 +17,7 @@ import ScoreDisplay from "./src/components/ScoreDisplay";
 import Icon from "react-native-vector-icons/Feather";
 import { CENSFeatures } from "./src/audio/FeaturesCENS";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
-import { ExpoMicProcessor } from "./src/audio/ExpoMicProcessor";
+// import { ExpoMicProcessor } from "./src/audio/ExpoMicProcessor";
 import ScoreFollowerTest from "./src/components/ScoreFollowerTest";
 // import {
 //   initNativeAudio,
@@ -58,8 +58,8 @@ export default function App() {
     },
   );
 
-  const [chroma, setChroma] = useState<number[]>(new Array(12).fill(0)); // Initialize the chroma state as an array of 12 zeros (used to capture chroma vector at each chunk of audio).
-  const [started, setStarted] = useState(false); // State used to determine user toggled the live microphone option or not
+  // const [chroma, setChroma] = useState<number[]>(new Array(12).fill(0)); // Initialize the chroma state as an array of 12 zeros (used to capture chroma vector at each chunk of audio).
+  // const [started, setStarted] = useState(false); // State used to determine user toggled the live microphone option or not
   const [isLoggedIn, setIsLoggedIn] = useState(false); // State to track if user is logged in
   const [showStats, setShowStats] = useState(false); // State to toggle statistics view
   const [currentUser, setCurrentUser] = useState<string | null>(null); // State to store current username
