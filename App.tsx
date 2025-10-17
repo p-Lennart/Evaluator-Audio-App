@@ -19,11 +19,11 @@ import { CENSFeatures } from "./src/audio/FeaturesCENS";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
 import { ExpoMicProcessor } from "./src/audio/ExpoMicProcessor";
 import ScoreFollowerTest from "./src/components/ScoreFollowerTest";
-import {
-  initNativeAudio,
-  initWebAudio,
-  stopLiveAudio,
-} from "./src/utils/liveMicUtils";
+// import {
+//   initNativeAudio,
+//   initWebAudio,
+//   stopLiveAudio,
+// } from "./src/utils/liveMicUtils";
 import { useThemeAnimations } from "./src/utils/themeUtils";
 import LoginScreen from "./src/components/LoginScreen";
 import PerformanceStats from "./src/components/PerformanceStats";
@@ -69,19 +69,19 @@ export default function App() {
   const N_FFT = 4096; // Define chunk size for ChromaMaker
   const chromaMaker = useRef(new CENSFeatures(SAMPLE_RATE, N_FFT)).current; // Create a stable ChromaMaker instance
 
-  // Initialize mic to capture live audio when "started" state changes (on mic icon click)
-  useEffect(() => {
-    if (started) {
-      if (Platform.OS === "web") {
-        initWebAudio(setChroma, chromaMaker).catch(console.error); // Web version of live mic
-      } else {
-        initNativeAudio(setChroma, processor, chromaMaker).catch(console.error); // Mobile version of live mic
-      }
-    }
-    return () => {
-      stopLiveAudio(processor); // Stop and clean up live microphone on unmount
-    };
-  }, [started]);
+  // // Initialize mic to capture live audio when "started" state changes (on mic icon click)
+  // useEffect(() => {
+  //   if (started) {
+  //     if (Platform.OS === "web") {
+  //       initWebAudio(setChroma, chromaMaker).catch(console.error); // Web version of live mic
+  //     } else {
+  //       initNativeAudio(setChroma, processor, chromaMaker).catch(console.error); // Mobile version of live mic
+  //     }
+  //   }
+  //   return () => {
+  //     stopLiveAudio(processor); // Stop and clean up live microphone on unmount
+  //   };
+  // }, [started]);
 
   const {
     theme, // Variable used to determine the colors of the following styles
@@ -199,8 +199,10 @@ export default function App() {
                 color="white"
               />
             </TouchableOpacity>
-            {/* Light & Dark Mode is disabled for now - due to not looking too good after adding more stuff */}
-            <TouchableOpacity
+            
+            
+            {/* Live mic is work in progress with online dtw - also disabled */}
+            {/* <TouchableOpacity
               disabled={true}
               onPress={() => setStarted(!started)}
             >
@@ -209,15 +211,16 @@ export default function App() {
                 size={isSmallScreen ? 15 : 30}
                 color="grey"
               />
-            </TouchableOpacity>
-            {/* Live mic is work in progress with online dtw - also disabled */}
-            <TouchableOpacity disabled={true} onPress={toggleTheme}>
+            </TouchableOpacity> */}
+
+            {/* Light & Dark Mode is disabled for now - due to not looking too good after adding more stuff */}
+            {/* <TouchableOpacity disabled={true} onPress={toggleTheme}>
               <Icon
                 name={theme === "light" ? "sun" : "moon"}
                 size={isSmallScreen ? 15 : 30}
                 color="grey"
               />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </Animated.View>
       </SafeAreaView>
