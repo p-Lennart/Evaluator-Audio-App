@@ -103,45 +103,6 @@ export function Score_Select({
       </View>
 
       {/* Upload WAV file feature */}
-      <Animated.Text style={{ color: textStyle, marginTop: 12 }}>
-        Or upload a new score:
-      </Animated.Text>
-      <Animated.View
-        style={[
-          styles.input,
-          {
-            borderBottomWidth: 2,
-            borderBottomColor: borderStyle,
-            paddingBottom: 24,
-          },
-        ]}
-      >
-        {/* If on browser render upload field for web*/}
-        {Platform.OS === "web" ? (
-          <input
-            type="file"
-            accept=".musicxml"
-            onChange={(e) => musicXmlUploadWeb(e, state.scores, dispatch)}
-            style={{ color: "#000" }}
-            disabled={true}
-          />
-        ) : (
-          // Else render upload field for mobile
-          <Animated.View>
-            <TouchableOpacity
-              onPress={() => musicXmlUploadNative(state.scores, dispatch)}
-              disabled={true}
-              style={[...button_format, styles.disabledButton]}
-            >
-              <Animated.Text
-                style={{ color: button_text_style, fontWeight: "bold" }}
-              >
-                Upload File
-              </Animated.Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </Animated.View>
     </View>
   );
 }

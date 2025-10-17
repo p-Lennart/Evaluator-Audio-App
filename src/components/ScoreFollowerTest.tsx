@@ -20,14 +20,22 @@ import {
   pickMobileWavFile,
 } from "../utils/fileSelectorUtils";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
-import { 
-  getScoreRefAudio, 
+import {
+  getScoreRefAudio,
   getScoreCSVData,
-  unifiedScoreMap 
+  unifiedScoreMap,
 } from "../score_name_to_data_map/unifiedScoreMap";
 
-import { getCurrentUser, savePerformanceData, PerformanceData } from "../utils/accountUtils";
-import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
+import {
+  getCurrentUser,
+  savePerformanceData,
+  PerformanceData,
+} from "../utils/accountUtils";
+import {
+  calculateIntonation,
+  intonationToNoteColor,
+  testIntonation,
+} from "../audio/Intonation";
 import { NoteColor } from "../utils/musicXmlUtils";
 
 interface ScoreFollowerTestProps {
@@ -94,16 +102,16 @@ export default function ScoreFollowerTest({
   const saveCurrentPerformance = async () => {
     const user = await getCurrentUser();
     if (!user) {
-      console.log('No user logged in');
-      alert('Please log in to save performance data');
+      console.log("No user logged in");
+      alert("Please log in to save performance data");
       return;
     }
 
     const performanceData: PerformanceData = {
       id: Date.now().toString(),
-      scoreName: score || 'unknown',
+      scoreName: score || "unknown",
       timestamp: new Date().toISOString(),
-      intonationData: csvDataRef.current.map(row => row.intonation || 0),
+      intonationData: csvDataRef.current.map((row) => row.intonation || 0),
       csvData: csvDataRef.current,
       warpingPath: pathRef.current,
       tempo: bpm,
@@ -111,8 +119,8 @@ export default function ScoreFollowerTest({
 
     await savePerformanceData(performanceData);
     setPerformanceSaved(true);
-    console.log('Performance saved successfully');
-    alert('Performance saved successfully!');
+    console.log("Performance saved successfully");
+    alert("Performance saved successfully!");
   };
 
   const runFollower = async () => {
@@ -203,7 +211,7 @@ export default function ScoreFollowerTest({
           predictedTimes,
           sr,
           intonationParams[0],
-          intonationParams[1],
+          intonationParams[1]
         );
 
         // Debug sequence: tiled flat-neutral-sharp
@@ -228,7 +236,10 @@ export default function ScoreFollowerTest({
           intonation: intonation[i],
         }));
 
-        console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
+        console.log(
+          `New table with (win, hop) (${intonationParams}):`,
+          newTable
+        );
       }
 
       console.log(pathRef.current); // Show full path
@@ -248,19 +259,22 @@ export default function ScoreFollowerTest({
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
-          
+
           if (iterations % 10 == 0) {
-            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current);
-            
+            const intonationChunk = csvDataRef.current.slice(
+              0,
+              nextIndexRef.current
+            );
+
             const noteColors: NoteColor[] = intonationChunk.map((row, idx) => {
               return intonationToNoteColor(row.intonation, 0 + idx);
             });
 
             dispatch({
-                type: "SET_NOTE_COLORS",
-                payload: noteColors,
+              type: "SET_NOTE_COLORS",
+              payload: noteColors,
             });
-          } 
+          }
 
           nextIndexRef.current++; // Go to next row of csv
         }
@@ -285,7 +299,7 @@ export default function ScoreFollowerTest({
           shouldPlay: true, // Automatically start playback once loaded
           progressUpdateIntervalMillis: 10, // Set how often status updates are triggered
         },
-        onPlaybackStatusUpdate, // Callback to handle playback progress (frame processing, alignment, etc.)
+        onPlaybackStatusUpdate // Callback to handle playback progress (frame processing, alignment, etc.)
       );
       soundRef.current = sound;
     } catch (err) {
@@ -470,7 +484,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C3E50",
     borderRadius: 8,
     alignItems: "center",
-    marginBottom: 8,
+    // marginBottom: 8,
     // optional hard cap to be safer:
     maxWidth: 220,
   },

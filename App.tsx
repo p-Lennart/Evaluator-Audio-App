@@ -55,7 +55,7 @@ export default function App() {
       bottomAudioUri: null as string | null, // Playback audio uri (for when there is two instruments - ref audio uri to bottom one, only applicable in Companion Project)
       beatsPerMeasure: 0, // Numerator of time signature used to compute values for the tempo by measure graph (TempoGraph.tsx)
       loadingPerformance: false, // Boolean indicator to let other components know if we are currently loading a performance or not to enable or disable certain functions
-    },
+    }
   );
 
   const [chroma, setChroma] = useState<number[]>(new Array(12).fill(0)); // Initialize the chroma state as an array of 12 zeros (used to capture chroma vector at each chunk of audio).
@@ -200,7 +200,7 @@ export default function App() {
               />
             </TouchableOpacity>
             {/* Light & Dark Mode is disabled for now - due to not looking too good after adding more stuff */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               disabled={true}
               onPress={() => setStarted(!started)}
             >
@@ -209,15 +209,15 @@ export default function App() {
                 size={isSmallScreen ? 15 : 30}
                 color="grey"
               />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
             {/* Live mic is work in progress with online dtw - also disabled */}
-            <TouchableOpacity disabled={true} onPress={toggleTheme}>
+            {/* <TouchableOpacity disabled={true} onPress={toggleTheme}>
               <Icon
                 name={theme === "light" ? "sun" : "moon"}
                 size={isSmallScreen ? 15 : 30}
                 color="grey"
               />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </Animated.View>
       </SafeAreaView>
