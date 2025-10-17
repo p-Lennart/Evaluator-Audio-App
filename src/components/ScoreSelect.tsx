@@ -9,7 +9,7 @@ import RNPickerSelect from "react-native-picker-select";
 import React, { useEffect } from "react";
 import Icon from "react-native-vector-icons/FontAwesome";
 import scoreToMidi from "../score_name_to_data_map/scoreToMidi";
-import AudioGenerator from "../audio/AudioGenerator";
+// import AudioGenerator from "../audio/AudioGenerator";
 import {
   musicXmlUploadWeb,
   musicXmlUploadNative,
@@ -96,13 +96,12 @@ export function Score_Select({
 
         {/* Old component used to generate wav files given midi but no longer needed since we have direct access to wav files */}
         {/* This component doesnt render anything visually but just stores the wav audio that is generated from the given midi to the global state */}
-        <AudioGenerator
+        {/* <AudioGenerator
           midiModule={scoreToMidi[state.score]}
           dispatch={dispatch}
-        />
+        /> */}
       </View>
 
-      {/* Upload WAV file feature */}
       <Animated.Text style={{ color: textStyle, marginTop: 12 }}>
         Or upload a new score:
       </Animated.Text>

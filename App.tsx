@@ -64,10 +64,10 @@ export default function App() {
   const [showStats, setShowStats] = useState(false); // State to toggle statistics view
   const [currentUser, setCurrentUser] = useState<string | null>(null); // State to store current username
 
-  const processor = useRef(new ExpoMicProcessor()).current; // Create a stable ExpoMicProcessor instance
-  const SAMPLE_RATE = 44100; // Define sample rate for ChromaMaker
-  const N_FFT = 4096; // Define chunk size for ChromaMaker
-  const chromaMaker = useRef(new CENSFeatures(SAMPLE_RATE, N_FFT)).current; // Create a stable ChromaMaker instance
+  // const processor = useRef(new ExpoMicProcessor()).current; // Create a stable ExpoMicProcessor instance
+  // const SAMPLE_RATE = 44100; // Define sample rate for ChromaMaker
+  // const N_FFT = 4096; // Define chunk size for ChromaMaker
+  // const chromaMaker = useRef(new CENSFeatures(SAMPLE_RATE, N_FFT)).current; // Create a stable ChromaMaker instance
 
   // // Initialize mic to capture live audio when "started" state changes (on mic icon click)
   // useEffect(() => {
