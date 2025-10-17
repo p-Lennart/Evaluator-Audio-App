@@ -102,10 +102,10 @@ export function Score_Select({
         /> */}
       </View>
 
-      <Animated.Text style={{ color: textStyle, marginTop: 12 }}>
+      {/* <Animated.Text style={{ color: textStyle, marginTop: 12 }}>
         Or upload a new score:
-      </Animated.Text>
-      <Animated.View
+      </Animated.Text> */}
+      {/* <Animated.View
         style={[
           styles.input,
           {
@@ -114,9 +114,9 @@ export function Score_Select({
             paddingBottom: 24,
           },
         ]}
-      >
+      > */}
         {/* If on browser render upload field for web*/}
-        {Platform.OS === "web" ? (
+        {/* {Platform.OS === "web" ? (
           <input
             type="file"
             accept=".musicxml"
@@ -139,8 +139,8 @@ export function Score_Select({
               </Animated.Text>
             </TouchableOpacity>
           </Animated.View>
-        )}
-      </Animated.View>
+        )} */}
+      {/* </Animated.View> */}
     </View>
   );
 }
