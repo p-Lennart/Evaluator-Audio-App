@@ -188,7 +188,12 @@ export function getAllGraphicalNotes(osmd: any): any[] {
   return notes;
 }
 
-export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; color: string }>) {
+export type NoteColor = {
+  index: number;
+  color: string;
+};
+
+export function applyNoteColors(osmd: any, noteColors: NoteColor[]) {
   if (!osmd) return;
 
   const allNotes = getAllGraphicalNotes(osmd);
