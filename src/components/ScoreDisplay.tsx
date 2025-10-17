@@ -6,6 +6,8 @@ import {
   Platform,
   useWindowDimensions,
   ActivityIndicator,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
 import React, { useRef, useEffect, useState } from "react";
 import { Cursor, OpenSheetMusicDisplay } from "opensheetmusicdisplay";
@@ -17,6 +19,7 @@ import {
   initOsmdWeb,
   onHandleOsmdMessageForNative,
   peekAtCurrentBeat,
+  resetCursor,
 } from "../utils/osmdUtils"; // Helper functions used to manipulate the OSMD Display
 
 export default function ScoreDisplay({
@@ -51,7 +54,7 @@ export default function ScoreDisplay({
     // MOBILE branch: send JS into the WebView to move the cursor (same logic as the web one, can be seen from buildOsmdHtmlForNative helper function)
     if (Platform.OS !== "web") {
       webviewRef.current?.injectJavaScript(
-        `window.stepCursor(${parseFloat(steps)}); true;`,
+        `window.stepCursor(${parseFloat(steps)}); true;`
       );
       return;
     }
@@ -74,8 +77,8 @@ export default function ScoreDisplay({
       initialBeats = peekAtCurrentBeat(
         cursorRef.current!,
         osdRef.current!.Sheet.Instruments,
-        denom,
-      ); // Intialbeats = beat value of the current note that the cursor is on
+        denom
+      ); // Initialbeats = beat value of the current note that the cursor is on
     }
     movedBeats.current = initialBeats; // This is accounting for the first note that the cursor highlights at the beginning
     console.log("movedBeats :", movedBeats);
@@ -102,7 +105,7 @@ export default function ScoreDisplay({
         // Move cursor to next note and return the beat value of that next note
         cursorRef.current!,
         osdRef.current!.Sheet.Instruments,
-        denom,
+        denom
       );
 
       moved += delta; // Accumulate the moved beats
@@ -121,6 +124,18 @@ export default function ScoreDisplay({
   }, [state.estimatedBeat]); // Queue when global beat value changes
 
   useEffect(() => {
+    initOsmdWeb(
+      osmContainerRef,
+      osdRef,
+      cursorRef,
+      state,
+      dispatch,
+      isSmallScreen
+    );
+    state.resetScore = false;
+  }, [state.resetScore]);
+
+  useEffect(() => {
     if (steps === "") return; // Chained useeffect to have steps state updated properly before running the cursor movement logic
     moveCursorByBeats(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
@@ -133,7 +148,7 @@ export default function ScoreDisplay({
       cursorRef,
       state,
       dispatch,
-      isSmallScreen,
+      isSmallScreen
     ); // Initializes osdRef and cursorRef
   }, [dispatch, state.score, state.scores]);
 
@@ -145,7 +160,7 @@ export default function ScoreDisplay({
   return (
     <>
       {/* Temporary inputs for testing cursor movement */}
-      {/* <TextInput
+      <TextInput
         value={steps}
         onChangeText={setSteps}
         keyboardType="numeric"
@@ -158,11 +173,9 @@ export default function ScoreDisplay({
         placeholder="Cursor Update Speed (ms)"
       />
 
-      <TouchableOpacity 
-      onPress={moveCursorByBeats}
-      >
+      <TouchableOpacity onPress={moveCursorByBeats}>
         <Text>Start</Text>
-      </TouchableOpacity> */}
+      </TouchableOpacity>
 
       {/* Reference ScrollView Component for controlling scroll */}
       <ScrollView

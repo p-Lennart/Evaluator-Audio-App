@@ -39,7 +39,7 @@ const reducer_function = (state: any, action: any) => {
     case "new_scores_from_backend": // Gets list of scores - without overwriting uploaded score
       var known_files = state.scores;
       var new_files = action.scores.filter(
-        (filename: string) => !known_files.includes(filename),
+        (filename: string) => !known_files.includes(filename)
       );
       console.log("New files are: ", new_files);
       return {
@@ -63,7 +63,7 @@ const reducer_function = (state: any, action: any) => {
     case "change_reference_audio": // Keep the existing state and update the URI for reference audio
       console.log(
         "[reducer] referenceAudioUri stored in state:",
-        action.referenceAudioUri,
+        action.referenceAudioUri
       );
       return {
         ...state,
@@ -75,6 +75,14 @@ const reducer_function = (state: any, action: any) => {
       return {
         ...state,
         estimatedBeat: action.payload as number,
+      };
+
+    case "RESET_SCORE": // Reset global state to initial values
+      console.log("[reducer] Resetting score to initial state.");
+      return {
+        ...state,
+        playing: false,
+        resetScore: true,
       };
 
     case "change_bottom_audio": // Keep the existing state and update the URI for playback audio (second instrument - only used in Companion Project) audio

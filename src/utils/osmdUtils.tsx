@@ -21,14 +21,14 @@ export const initOsmdWeb = (
   cursorRef: React.MutableRefObject<Cursor | null>,
   state: any,
   dispatch: Function,
-  isSmallScreen: boolean,
+  isSmallScreen: boolean
 ) => {
   if (Platform.OS === "web" && osmContainerRef.current && state.score) {
     // Remove any previously-loaded music
     if (osmContainerRef.current) {
       while (osmContainerRef.current.children[0]) {
         osmContainerRef.current.removeChild(
-          osmContainerRef.current.children[0],
+          osmContainerRef.current.children[0]
         );
       }
     }
@@ -39,7 +39,7 @@ export const initOsmdWeb = (
       {
         autoResize: true, // Enable automatic resizing of the sheet music display
         followCursor: true, // And follow the cursor
-      },
+      }
     );
     osdRef.current = osm;
     // If score name is a key within ScoreContents use the xml content value within that key, otherwise access xml content through the static key value mapping defined within scores.ts
@@ -96,7 +96,7 @@ export const initOsmdWeb = (
 export const peekAtNextBeat = (
   cursor: Cursor,
   instruments: any[],
-  timeDenominator: number,
+  timeDenominator: number
 ): number => {
   let delta = 0;
   cursor.next();
@@ -124,7 +124,7 @@ export const peekAtNextBeat = (
 export const advanceToNextBeat = (
   cursor: Cursor,
   instruments: any[],
-  timeDenominator: number,
+  timeDenominator: number
 ): number => {
   cursor.next();
   const current = cursor.VoicesUnderCursor(instruments[0]);
@@ -140,6 +140,18 @@ export const advanceToNextBeat = (
 };
 
 /**
+ * Reset the cursor to the beginning of the score and make it visible.
+ * @param cursor - OSMD Cursor Instance.
+ * @returns void
+ */
+
+export const resetCursor = (cursor: Cursor): void => {
+  cursor.reset();
+  cursor.resetIterator();
+  cursor.show();
+};
+
+/**
  * Peek at the beat length of the **current note** under the cursor.
  *
  * @param cursor - OSMD Cursor instance.
@@ -150,7 +162,7 @@ export const advanceToNextBeat = (
 export const peekAtCurrentBeat = (
   cursor: Cursor,
   instruments: any[],
-  timeDenominator: number,
+  timeDenominator: number
 ): number => {
   let delta = 0;
   const current = cursor.VoicesUnderCursor(instruments[0]);
@@ -180,7 +192,7 @@ export const peekAtCurrentBeat = (
  */
 export const buildOsmdHtmlForNative = (
   xml: string,
-  defaultZoom = 0.45,
+  defaultZoom = 0.45
 ): string => {
   const escaped = xml
     .replace(/`/g, "\\`")

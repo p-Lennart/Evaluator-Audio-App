@@ -48,6 +48,7 @@ export default function App() {
       scores: [], // The list of scores to choose from
       referenceAudioUri: null as string | null, // Reference to score's top voice audio uri (first instrument)
       estimatedBeat: null as number | null, // Beat value we think the soloist is at
+      resetScore: false, // Boolean used to trigger reinitialization of the OSMD display (used when changing scores)
       bottomAudioUri: null as string | null, // Playback audio uri (for when there is two instruments - ref audio uri to bottom one, only applicable in Companion Project)
       beatsPerMeasure: 0, // Numerator of time signature used to compute values for the tempo by measure graph (TempoGraph.tsx)
       loadingPerformance: false, // Boolean indicator to let other components know if we are currently loading a performance or not to enable or disable certain functions
@@ -79,7 +80,7 @@ export default function App() {
   const {
     theme, // Variable used to determine the colors of the following styles
 
-    // Dynmaic styles based on "theme"
+    // Dynamic styles based on "theme"
     containerBackgroundColor,
     textColor,
     invertTextColor,
