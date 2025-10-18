@@ -192,6 +192,7 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
   if (!osmd) return;
 
   const allNotes = getAllGraphicalNotes(osmd);
+  console.log("Found", allNotes.length, "graphical notes");
   if (!allNotes.length) return;
 
   // fast lookup map from index -> color
@@ -273,148 +274,178 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
  * @param defaultZoom - Default zoom factor to apply (defaults to 0.45 for mobile).
  * @returns A self-contained HTML string for injection into a WebView.
  */
-export const buildOsmdHtmlForNative = (
-  xml: string,
-  defaultZoom = 0.45,
-): string => {
-  const escaped = xml
+export function buildOsmdHtmlForNative(mxmlString: string) {
+  const escapedXml = mxmlString
+    .replace(/\\/g, "\\\\")
     .replace(/`/g, "\\`")
-    .replace(/<\/script>/g, "<\\/script>");
+    .replace(/\$/g, "\\$")
+    .replace(/\n/g, "\\n");
 
-  return `<!DOCTYPE html>
-  <html>
-    <head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.7/build/opensheetmusicdisplay.min.js"></script>
+      <style>
+        body { margin: 0; padding: 0; background: #fff; }
+        #osmd-container { width: 100%; height: 100%; }
+      </style>
+    </head>
     <body>
       <div id="osmd-container"></div>
-      <script src="https://unpkg.com/opensheetmusicdisplay@latest/build/opensheetmusicdisplay.min.js"></script>
       <script>
-        // 1) State holders for moved / overshoot, and the loop ID
-        window.__movedBeats = 0;
-        window.__overshootBeats = 0;
-        window.__stepLoopId = null;
+        console.log("[WebView] Initializing OpenSheetMusicDisplay...");
 
-        (async () => {
-          // 2) Load & render once
-          const osm = new opensheetmusicdisplay.OpenSheetMusicDisplay(
-            document.getElementById('osmd-container'),
-            { autoResize: true, followCursor: true }
-          );
-          await osm.load(\`${escaped}\`);
-          osm.render();
+        const container = document.getElementById("osmd-container");
+        const osm = new opensheetmusicdisplay.OpenSheetMusicDisplay(container, {
+          autoResize: true,
+          backend: "svg",
+          drawTitle: true,
+          drawPartNames: true,
+          followCursor: false,
+        });
 
-          // 3) Expose osm & cursor
-          window.osm = osm;
-          osm.zoom = ${defaultZoom};
-          window.cursor = osm.cursor;
-          cursor.show();
-          cursor.CursorOptions = { ...cursor.CursorOptions, follow: true };
+        // Load & render
+        osm
+          .load(\`${escapedXml}\`)
+          .then(() => osm.render())
+          .then(() => {
+            console.log("[WebView] OSMD loaded, initializing cursor...");
 
-          // 4) Expose a single stepCursor function
-          window.stepCursor = function(targetBeats) {
-            // Cancel any previous loop
-            if (window.__stepLoopId !== null) {
-              cancelAnimationFrame(window.__stepLoopId);
-            }
+            // Initialize and show cursor
+            osm.cursor.show();
 
-            // Web‑version’s readiness check
-            if (!osm.IsReadyToRender()) {
-              console.warn("Please call load() and render() before stepping cursor.");
-              return;
-            }
+            const tempo = osm.sheet?.tempo || 100;
+            const firstMeasure = osm.sheet?.FirstMeasure;
+            const beatsPerMeasure = firstMeasure?.ActiveTimeSignature?.numerator || 4;
 
-            const measures = osm.GraphicSheet.MeasureList;
-            if (!measures.length || !measures[0].length) return;
-            const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature.denominator;
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: "loaded",
+              tempo,
+              beatsPerMeasure,
+            }));
 
-            // Initial‑only beat calc
-            let initialBeats = window.__movedBeats;
-            if (initialBeats === 0) {
-              const init = cursor.VoicesUnderCursor(osm.Sheet.Instruments[0]);
-              if (init.length && init[0].Notes.length) {
-                const len = init[0].Notes[0].Length;
-                const num = len.Numerator === 0 ? 1 : len.Numerator;
-                initialBeats = (num / len.Denominator) * denom;
+            console.log(\`[WebView] OSMD loaded: tempo=\${tempo}, beatsPerMeasure=\${beatsPerMeasure}\`);
+          })
+          .catch(e => console.error("OSMD load error", e));
+
+
+        // ===== Helper: Apply Note Colors (skip rests) =====
+        function applyNoteColors(osmd, noteColors) {
+          if (!osmd || !osmd.GraphicSheet) return;
+
+          // Get all graphical notes (skip rests, like music21.notes)
+          const allGraphicalNotes = [];
+          const measureList = osmd.GraphicSheet.MeasureList || [];
+          
+          for (const staffMeasures of measureList) {
+            for (const measure of staffMeasures || []) {
+              for (const staffEntry of measure.staffEntries || []) {
+                for (const gve of staffEntry.graphicalVoiceEntries || []) {
+                  for (const gNote of gve.notes || []) {
+                    const src = gNote.sourceNote;
+                    if (src && !(src.isRest && src.isRest())) {
+                      allGraphicalNotes.push(gNote);
+                    }
+                  }
+                }
               }
-            }
-            window.__movedBeats = initialBeats;
-
-            const toMove = Math.max(0, targetBeats);
-            let moved = window.__movedBeats + window.__overshootBeats;
-            window.__overshootBeats = 0;
-
-            // Step logic exactly as web version
-            function stepFn() {
-              
-              // if we’ve already reached the target
-              if (moved >= toMove) {
-                const leftover = moved - toMove;
-                window.__overshootBeats = leftover;
-                window.__movedBeats = toMove;
-                osm.render();
-                return;
-              }
-
-              // actually advance once
-              cursor.next();
-              cur = cursor.VoicesUnderCursor(osm.Sheet.Instruments[0]);
-              delta = 0;
-              if (cur.length && cur[0].Notes.length) {
-                const len = cur[0].Notes[0].Length;
-                const num = len.Numerator === 0 ? 1 : len.Numerator;
-                delta = (num / len.Denominator) * denom;
-              }
-              moved += delta;
-              window.__movedBeats = moved;
-
-              osm.render();
-              // schedule the next frame
-              window.__stepLoopId = requestAnimationFrame(stepFn);
-            }
-
-            // start it
-            window.__stepLoopId = requestAnimationFrame(stepFn);
-          };
-
-          const ts = cursor.Iterator.CurrentMeasure.ActiveTimeSignature;
-
-          // get raw xml
-          const rawXML = ${JSON.stringify(escaped)};
-
-          // extract ref tempo given xml
-          function extractTempoFromXML(xmlString) {
-            try {
-              const parser = new DOMParser();
-              const xmlDoc = parser.parseFromString(xmlString, "application/xml");
-
-              const sound = xmlDoc.querySelector("sound[tempo]");
-              if (sound?.getAttribute("tempo")) {
-                return parseFloat(sound.getAttribute("tempo"));
-              }
-
-              const perMin = xmlDoc.querySelector("metronome > per-minute");
-              if (perMin?.textContent) {
-                return parseFloat(perMin.textContent);
-              }
-
-              return null;
-            } catch (e) {
-              console.warn("Tempo extraction failed:", e);
-              return null;
             }
           }
 
-          const tempo = extractTempoFromXML(rawXML); // call helper function to get ref tempo 
+          console.log("[WebView] Found", allGraphicalNotes.length, "playable notes");
 
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'loaded',
-            beatsPerMeasure: ts.numerator,
-            tempo: tempo,
-          }));
-        })();
+          // Build fast lookup map
+          const colorMap = new Map();
+          (noteColors || []).forEach(n => colorMap.set(n.index, n.color));
+
+          // Apply colors using OSMD's sourceNote properties (primary method)
+          allGraphicalNotes.forEach((gNote, idx) => {
+            const color = colorMap.get(idx);
+            if (!color && color !== "") return;
+
+            try {
+              // 1) Set sourceNote properties (OSMD's preferred method)
+              if (gNote.sourceNote) {
+                if (typeof gNote.sourceNote.NoteheadColor !== "undefined") {
+                  gNote.sourceNote.NoteheadColor = color;
+                } else if (gNote.sourceNote.Notehead) {
+                  gNote.sourceNote.Notehead.color = color;
+                } else {
+                  gNote.sourceNote.color = color;
+                }
+              }
+
+              // 2) VexFlow fallback for immediate visual update
+              const vf = gNote.vfnote;
+              if (vf) {
+                if (typeof vf.setStyle === "function") {
+                  vf.setStyle({ fillStyle: color, strokeStyle: color });
+                }
+                // Color individual noteheads if available
+                if (vf.note_heads && Array.isArray(vf.note_heads)) {
+                  vf.note_heads.forEach(head => {
+                    if (head.setStyle) {
+                      head.setStyle({ fillStyle: color, strokeStyle: color });
+                    }
+                  });
+                }
+              }
+            } catch (err) {
+              console.warn("[WebView] Failed to color note", idx, err);
+            }
+          });
+
+          // Re-render to apply sourceNote color changes
+          try {
+            osmd.render();
+            console.log("[WebView] Applied", noteColors.length, "note colors and re-rendered");
+          } catch (e) {
+            console.error("[WebView] osmd.render() failed", e);
+          }
+        }
+
+        // ===== Cross-Platform Message Listener =====
+        function handleRNMessage(event) {
+          try {
+            const msg = JSON.parse(event.data);
+            console.log("[WebView] RN->WebView message:", msg);
+
+
+            // Handle note coloring
+            if (msg.type === "colorNotes" && Array.isArray(msg.noteColors)) {
+              applyNoteColors(osm, msg.noteColors);
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: "colorNotesAck",
+                count: msg.noteColors.length,
+              }));
+            }
+
+            // Handle cursor movement
+            else if (msg.type === "moveCursor" && typeof msg.targetBeats === "number") {
+              moveCursorByBeats(msg.targetBeats);
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: "cursorMovedAck",
+                targetBeats: msg.targetBeats,
+              }));
+            }
+
+          } catch (err) {
+            console.error("Bad RN->WebView message", err);
+          }
+        }
+
+        // ✅ Works in RN
+        window.ReactNativeWebView.onMessage = handleRNMessage;
+
+        // ✅ Works in browser preview (for dev)
+        window.addEventListener("message", handleRNMessage);
       </script>
     </body>
-  </html>`;
-};
+    </html>
+  `;
+}
 
 /**
  * Handles messages sent from the OSMD WebView back to React Native.
@@ -425,19 +456,46 @@ export const buildOsmdHtmlForNative = (
  */
 export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
   try {
-    // Extract the message string sent via window.ReactNativeWebView.postMessage(...)
     const data = JSON.parse(raw);
 
-    // We expect a message of type 'loaded' sent after OSMD has finished rendering
-    if (data.type === "loaded") {
-      dispatch({
-        type: "update_piece_info",
-        tempo: data.tempo, // Update ref tempo in global state
-        beatsPerMeasure: data.beatsPerMeasure, // Update beats per measure in global state
-      });
+    switch (data.type) {
+      // ---- OSMD finished loading ----
+      case "loaded":
+        dispatch({
+          type: "update_piece_info",
+          tempo: data.tempo ?? null,
+          beatsPerMeasure: data.beatsPerMeasure ?? null,
+        });
+        console.log(`[WebView] OSMD loaded: tempo=${data.tempo}, beatsPerMeasure=${data.beatsPerMeasure}`);
+        break;
+
+      // ---- Console messages (bridge from webview) ----
+      case "log":
+        const msgText = (data.args || []).join(" ");
+        if (data.level === "warn") console.warn("[WebView]", msgText);
+        else if (data.level === "error") console.error("[WebView]", msgText);
+        else console.log("[WebView]", msgText);
+        break;
+
+      // ---- Color note confirmation ----
+      case "colorNotesAck":
+        console.log(`[WebView] Applied ${data.count} note color updates`);
+        // Optionally, you could dispatch an action here:
+        // dispatch({ type: "color_notes_applied", count: data.count });
+        break;
+      
+      // ---- Cursor movement confirmation ----
+      case "cursorMovedAck":
+        console.log(`[WebView] Cursor moved to beat ${data.targetBeats}`);
+        break;
+
+      // ---- Unknown message type ----
+      default:
+        console.warn("[WebView] Unhandled message type:", data.type, data);
+        break;
     }
   } catch (e) {
-    // Catch and log any errors during message parsing or if expected fields are missing
-    console.error("Failed to parse WebView message", e);
+    console.error("Failed to parse WebView message", e, raw);
   }
 };
+
