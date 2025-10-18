@@ -308,6 +308,15 @@ export default function ScoreFollowerTest({
     }
   };
 
+  const handleRestart = () => {
+    if (isWeb) {
+      // Check if window is available (it is on web/browser)
+      if (typeof window !== "undefined") {
+        window.location.reload(); // Refresh the browser page
+      }
+    }
+  };
+
   return (
     <View>
       {/* Test intonation Performance button */}
@@ -419,6 +428,15 @@ export default function ScoreFollowerTest({
           {performanceSaved ? "Performance Saved ✓" : "Save Performance"}
         </Text>
       </TouchableOpacity>
+
+      {isWeb && (
+        <TouchableOpacity
+          style={[styles.button, styles.restartButton]}
+          onPress={handleRestart}
+        >
+          <Text style={styles.buttonText}>Restart</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -434,6 +452,10 @@ const styles = StyleSheet.create({
   saveButton: {
     marginTop: 8,
     backgroundColor: "#27AE60",
+  },
+  restartButton: {
+    marginTop: 8,
+    backgroundColor: "#E74C3C",
   },
   disabledButton: {
     backgroundColor: "#555",
