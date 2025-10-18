@@ -6,7 +6,7 @@ import { NoteColor } from "../utils/musicXmlUtils";
 const OCTAVE_OFF_THRESHOLD = 2;
 const SEMITONE_THRESHOLD = 2;
 
-const AGGREGATE_DIVISOR = 2;
+const AGGREGATE_DIVISOR = 1.1;
 const AGGREGATE_DEFAULT_SIZE = 10;
 
 const COLOR_NEUTRAL = "#000000";
@@ -183,9 +183,11 @@ export function calculateIntonation(
   winLen: number,
   hopLen: number = winLen,
 ) {
+  console.log("-- Calculating Intonation")
   const audioF0s = calculateF0s(audioSamples, sampleRate, winLen, hopLen);
   const audioPitches = audioF0s.map((frq) => hzToMidi(frq));
-
+  
+  console.log("-- Calculating Intonation: got", audioF0s.length, "windows");
   return estimatePitchesAtTimestamps(
     audioTimesCol,
     scorePitchesCol,
@@ -204,7 +206,7 @@ export async function testIntonation(
   const audioData = await prepareAudio(audioUri, sr);
   const table: CSVRow[] = await loadCsvInfo(tableUri);
 
-  const timeColname = "refTime"; // Assume csv treats input audio as ref
+  const timeColname = "ref_ts"; // Assume csv treats input audio as ref
   if (!table[0][timeColname]) {
     console.error("No timestamp column in table with name", timeColname);
   }
@@ -229,6 +231,8 @@ export async function testIntonation(
   }));
 
   console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
+
+  return intonation;
 }
 
 export function intonationToNoteColor(intonation: number, noteIdx: number) {
