@@ -1,3 +1,5 @@
+import { Asset } from "expo-asset";
+import { File } from "expo-file-system";
 import * as waveResampler from "wave-resampler";
 const wav = require("node-wav");
 
