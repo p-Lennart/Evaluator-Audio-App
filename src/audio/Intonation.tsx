@@ -203,6 +203,7 @@ export async function testIntonation(
   tableUri: string,
   sr: number = 44100,
 ) {
+  console.log("-- Test intonation: load audio", audioUri)
   const audioData = await prepareAudio(audioUri, sr);
   const table: CSVRow[] = await loadCsvInfo(tableUri);
 

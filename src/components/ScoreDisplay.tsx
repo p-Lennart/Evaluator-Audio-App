@@ -119,8 +119,10 @@ export default function ScoreDisplay({
   };
 
   const colorNotesInOSMD = (noteColors: NoteColor[]) => {
+    if (!noteColors || !noteColors.length) return;
     // MOBILE branch
     if (Platform.OS !== "web") {
+      console.log("RN->Web message: color notes, len=", noteColors.length);
       webviewRef.current?.postMessage(JSON.stringify({
         type: "colorNotes",
         noteColors: noteColors,

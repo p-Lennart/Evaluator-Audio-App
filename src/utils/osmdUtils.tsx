@@ -527,6 +527,9 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
         // ===== Message Handler for React Native =====
         function handleRNMessage(event) {
           try {
+            // Log raw event for debugging
+            console.log("[WebView] Raw event received:", JSON.stringify(event));
+            
             const msg = JSON.parse(event.data);
             console.log("[WebView] RN->WebView message:", msg);
 
@@ -550,16 +553,22 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
 
           } catch (err) {
             console.error("[WebView] Bad RN->WebView message", err);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: "error",
+              message: err.toString(),
+            }));
           }
         }
 
         // ===== Register Message Listeners =====
-        // Works in React Native
-        window.ReactNativeWebView.onMessage = handleRNMessage;
-
-        // Works in browser preview (for dev)
+        // iOS uses window.addEventListener
         window.addEventListener("message", handleRNMessage);
+        
+        // Android uses document.addEventListener
+        document.addEventListener("message", handleRNMessage);
 
+        // Log that listeners are ready
+        console.log("[WebView] Message listeners registered");
       </script>
     </body>
     </html>
