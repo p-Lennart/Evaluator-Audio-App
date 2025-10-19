@@ -20,8 +20,8 @@ import {
   pickMobileWavFile,
 } from "../utils/fileSelectorUtils";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
-import {
-  getScoreRefAudio,
+import { 
+  getScoreRefAudio, 
   getScoreCSVData,
   unifiedScoreMap 
 } from "../score_name_to_data_map/unifiedScoreMap";
@@ -37,6 +37,8 @@ interface ScoreFollowerTestProps {
   FeaturesCls?: FeaturesConstructor<any>;
   state: any;
 }
+
+const SKIP_COMPUTATION = true;
 
 export default function ScoreFollowerTest({
   score,
@@ -82,13 +84,23 @@ export default function ScoreFollowerTest({
   }
 
   const runIntonation = async () => {
-    // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
-    // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
+    // // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
+    // // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
 
-    const audioUri = "/air_on_the_g_string/baseline/instrument_0.wav";
-    const csvUri = "/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv";
+    // const audioUri = "/air_on_the_g_string/baseline/instrument_0.wav";
+    // const csvUri = "/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv";
 
-    await testIntonation(audioUri, csvUri, 44100);
+    // Debug sequence: tiled flat-neutral-sharp
+    let debugTmp = [0,0,0,0,0,0,0,0,0,0,0,0];
+    let noteColors = 
+      debugTmp.map( (el, idx) => intonationToNoteColor((idx % 3) - 1, idx));
+
+    console.log("Debug tmp", noteColors);
+    dispatch({
+      type: "SET_NOTE_COLORS",
+      payload: noteColors
+    });
+
   };
 
   const saveCurrentPerformance = async () => {
@@ -129,21 +141,23 @@ export default function ScoreFollowerTest({
     try {
       // Use unified mapping for cross-platform file access
       const refUri = getScoreRefAudio(base);
+      
+      // console.log("-- Creating ScoreFollower...");
+      // followerRef.current = await ScoreFollower.create(refUri, FeaturesCls); // Initialize score follower instance (default parameters from ScoreFollower.tsx)
+      // console.log("-- ScoreFollower created");
 
-      console.log("-- Creating ScoreFollower...");
-      followerRef.current = await ScoreFollower.create(refUri, FeaturesCls); // Initialize score follower instance (default parameters from ScoreFollower.tsx)
-      console.log("-- ScoreFollower created");
+      // const follower = followerRef.current!;
+      // const refFeatures = follower.ref.featuregram; // Get reference features from follower instance
 
-      const follower = followerRef.current!;
-      const refFeatures = follower.ref.featuregram; // Get reference features from follower instance
+      // // Extract and set sample rate and window length from the ScoreFollower instance
+      // const { sr, winLen } = follower;
+      // setSampleRate(sr);
+      // setFrameSize(winLen);
 
-      // Extract and set sample rate and window length from the ScoreFollower instance
-      const { sr, winLen } = follower;
-      setSampleRate(sr);
-      setFrameSize(winLen);
-
-      const frameSize = winLen; // Set framesize to window length property of scorefollower
-      const sampleRate = sr; // Set sampleRate property of scorefollower
+      const frameSize = 4096; // Set framesize to window length property of scorefollower
+      const sampleRate = 44100; // Set sampleRate property of scorefollower
+      // const frameSize = winLen; // Set framesize to window length property of scorefollower
+      // const sampleRate = sr; // Set sampleRate property of scorefollower
       frameSecRef.current = frameSize / sampleRate; // Duration of each frame in seconds
 
       const audioData = await prepareAudio(liveFile.uri, sampleRate);
@@ -151,11 +165,11 @@ export default function ScoreFollowerTest({
       audioDataRef.current = audioData;
       console.log("-- Audio data prepared, length=", audioData.length);
 
-      console.log("-- Computing alignment path...");
-      console.log("   Live audio URI:", liveFile.uri);
-      console.log("   Ref audio URI:", refUri);
-      pathRef.current = await precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
-      console.log("-- Alignment path length=", pathRef.current.length);
+      // console.log("-- Computing alignment path...");
+      // console.log("   Live audio URI:", liveFile.uri);
+      // console.log("   Ref audio URI:", refUri);
+      // pathRef.current = precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
+      // console.log("-- Alignment path length=", pathRef.current.length);
 
       // const rawPath = computeOfflineAlignmentPath(refFeatures, audioDataRef.current, FeaturesCls, sr, winLen)
       // console.log("raw path: ", rawPath) // Just print to console log for now
@@ -163,8 +177,8 @@ export default function ScoreFollowerTest({
       // downloadFullPCM(audioDataRef.current)
 
       {
-        console.log("-- precompute CSV block: score=", score, "→ base=", base);
-        // Use unified mapping for CSV file access
+        // console.log("-- precompute CSV block: score=", score, "→ base=", base);
+        // // Use unified mapping for CSV file access
         const csvUri = getScoreCSVData(base);
         console.log("-- CSV URI =", csvUri);
 
@@ -174,23 +188,23 @@ export default function ScoreFollowerTest({
 
         csvDataRef.current = rows; // Save the parsed CSV rows for downstream use
 
-        const stepSize = frameSecRef.current; // Duration of each frame in seconds
-        const warpingPath = pathRef.current; // The Dynamic Time Warping path: an array of [referenceIndex, liveIndex] pairs
+        // const stepSize = frameSecRef.current; // Duration of each frame in seconds
+        // const warpingPath = pathRef.current; // The Dynamic Time Warping path: an array of [referenceIndex, liveIndex] pairs
         const refTimes = csvDataRef.current.map((r) => r.refTime); // Pull out just the reference times from each row to feed into the calculateWarpedTimes()
 
-        const predictedTimes = calculateWarpedTimes(
-          // Obtain array of ESTIMATED timestamps of when each note is played in the live audio
-          warpingPath,
-          stepSize,
-          refTimes,
-          true,
-          false
-        );
+        // const predictedTimes = calculateWarpedTimes(
+        //   // Obtain array of ESTIMATED timestamps of when each note is played in the live audio
+        //   warpingPath,
+        //   stepSize,
+        //   refTimes,
+        //   true,
+        //   false
+        // );
 
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
           ...row,
-          predictedTime: predictedTimes[i],
+          predictedTime: refTimes[i],
         }));
 
         console.log("New table", csvDataRef.current);
@@ -200,8 +214,8 @@ export default function ScoreFollowerTest({
         const intonation = calculateIntonation(
           audioData,
           scorePitchesCol,
-          predictedTimes,
-          sr,
+          refTimes,
+          sampleRate,
           intonationParams[0],
           intonationParams[1],
         );
@@ -228,10 +242,7 @@ export default function ScoreFollowerTest({
           intonation: intonation[i],
         }));
 
-        console.log(
-          `New table with (win, hop) (${intonationParams}):`,
-          newTable,
-        );
+        console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
       }
 
       console.log(pathRef.current); // Show full path
@@ -251,22 +262,19 @@ export default function ScoreFollowerTest({
         ) {
           const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
           dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
-
+          
           if (iterations % 10 == 0) {
-            const intonationChunk = csvDataRef.current.slice(
-              0,
-              nextIndexRef.current,
-            );
-
+            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current);
+            
             const noteColors: NoteColor[] = intonationChunk.map((row, idx) => {
               return intonationToNoteColor(row.intonation, 0 + idx);
             });
 
             dispatch({
-              type: "SET_NOTE_COLORS",
-              payload: noteColors,
+                type: "SET_NOTE_COLORS",
+                payload: noteColors,
             });
-          }
+          } 
 
           nextIndexRef.current++; // Go to next row of csv
         }
@@ -295,7 +303,7 @@ export default function ScoreFollowerTest({
       );
       soundRef.current = sound;
     } catch (err) {
-      console.error("ScoreFollower Error:", err, err.stack);
+      console.error("ScoreFollower Error:", err);
       dispatch({ type: "start/stop" });
     }
   };
