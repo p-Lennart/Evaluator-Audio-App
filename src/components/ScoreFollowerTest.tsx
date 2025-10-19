@@ -163,6 +163,8 @@ export default function ScoreFollowerTest({
           refTimes,
         );
 
+        console.log("Predicted times", predictedTimes);
+
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
           ...row,
@@ -171,7 +173,7 @@ export default function ScoreFollowerTest({
 
         const scorePitchesCol = csvDataRef.current.map((r) => r.midi);
         const intonationParams = [1024, 512];
-        const intonation = calculateIntonation(
+        const intonation = await calculateIntonation(
           audioData,
           scorePitchesCol,
           refTimes,

@@ -2,6 +2,7 @@ import { PitchDetector } from "pitchy";
 import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import { prepareAudio } from "../utils/audioUtils";
 import { NoteColor } from "../utils/musicXmlUtils";
+import { NativeModules, Platform } from "react-native";
 
 const OCTAVE_OFF_THRESHOLD = 2;
 const SEMITONE_THRESHOLD = 2;
@@ -14,6 +15,16 @@ const COLOR_SHARP = "#00ff00";
 const COLOR_FLAT = "#ff0000";
 
 const MISTAKE_THRESHOLD = 0.5;
+
+
+let PitchDetectionModule: any;
+if (Platform.OS === "android") {
+  try {
+    PitchDetectionModule = NativeModules.PitchDetectionModule;
+  } catch (e) {
+    console.log("Failed to load PitchDetectionModule: ", e);
+  }
+}
 
 function windowNumPerTs(
   timestamps: number[],
@@ -55,7 +66,7 @@ function hzToMidi(frequency: number): number {
   return midi;
 }
 
-function calculateF0s(
+async function calculateF0s(
   audioSamples: Float32Array,
   sampleRate: number,
   winLen: number,
@@ -72,11 +83,38 @@ function calculateF0s(
     const position = m * hopLen;
     const window = audioSamples.slice(position, position + winLen);
 
-    const [mcleodFrequency, mcleodFrequencyClarity] = mcleod.findPitch(
-      window,
-      sampleRate,
-    );
-    f0s.push(mcleodFrequency);
+    if (Platform.OS === "android") {
+      try {
+        const detectedFrequency = await PitchDetectionModule.getPitch(
+          sampleRate,
+          Array.from(window),
+        );
+
+        if (detectedFrequency === -1) {
+          // Reuse last pitch if no pitch is detected
+          f0s.push(f0s.last())
+        } else {
+          f0s.push(detectedFrequency);
+        }
+      } catch (e) {
+        console.error(
+          "Android native pitch detection failed, falling back to JS library",
+          e,
+        );
+
+        const [detectedFrequency, detectedFrequencyClarity] = mcleod.findPitch(
+          window,
+          sampleRate,
+        );
+        f0s.push(detectedFrequency);
+      }
+    } else {
+      const [detectedFrequency, detectedFrequencyClarity] = mcleod.findPitch(
+        window,
+        sampleRate,
+      );
+      f0s.push(detectedFrequency);
+    }
   }
 
   return f0s;
@@ -175,7 +213,7 @@ function estimatePitchesAtTimestamps(
   return pitchEstimates;
 }
 
-export function calculateIntonation(
+export async function calculateIntonation(
   audioSamples: Float32Array,
   scorePitchesCol: number[], // midi column of csv
   audioTimesCol: number[], // warped timestamps (or ref_ts column of csv for testing)
@@ -183,7 +221,7 @@ export function calculateIntonation(
   winLen: number,
   hopLen: number = winLen,
 ) {
-  const audioF0s = calculateF0s(audioSamples, sampleRate, winLen, hopLen);
+  const audioF0s = await calculateF0s(audioSamples, sampleRate, winLen, hopLen);
   const audioPitches = audioF0s.map((frq) => hzToMidi(frq));
 
   return estimatePitchesAtTimestamps(
@@ -213,7 +251,7 @@ export async function testIntonation(
   const audioTimesCol = table.map((r) => r[timeColname]);
 
   const intonationParams = [1024, 512];
-  const intonation = calculateIntonation(
+  const intonation = await calculateIntonation(
     audioData,
     scorePitchesCol,
     audioTimesCol,

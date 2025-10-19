@@ -11,9 +11,7 @@ import be.tarsos.dsp.util.fft.FFT
 import kotlin.FloatArray
 
 class FFTModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
-    override fun getName(): String {
-        return "FFTModule"
-    }
+    override fun getName() = "FFTModule"
 
     @ReactMethod
     fun fft(signalDataIn: ReadableArray, promise: Promise) {
