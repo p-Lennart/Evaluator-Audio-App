@@ -14,6 +14,8 @@ import {
   musicXmlUploadWeb,
   musicXmlUploadNative,
 } from "../utils/fileSelectorUtils";
+import { unifiedScoreMap } from "../score_name_to_data_map/unifiedScoreMap";
+import path from "path";
 
 export function Score_Select({
   // Data passed from App.tsx
@@ -34,15 +36,15 @@ export function Score_Select({
   // Array of score names used to render the available scores for the app
   // Entries are used within a hashmap to access certain data needed for the selected score
   const musicxmlFiles: string[] = [
-    "air_on_the_g_string.musicxml",
     "schumann_melodyVLCduet.musicxml",
-    "ode_to_joy.musicxml", // NOTE: csv and ref audio for this score to play starts about 4 secs into the performance (piece will not work if live audio starts playing at 0 secs instead of 4ish)
+    "go_tell_aunt_rhody.musicxml",
+    "air_on_the_g_string.musicxml",
+    "ode_to_joy.musicxml",
+  ]
 
-    // no csv data for the bottom 3 scores so they are commented out for now
-    // 'sonata.musicxml',
-    // 'hark.musicxml',
-    // 'green_sleeves.musicxml'
-  ];
+  // const musicxmlFiles: string[] = Object.values(unifiedScoreMap).map((val) => {
+  //   return path.basename(val.csvData.web);
+  // });
 
   // Populate our global stat.scores with the given scores in musicxmlFiles
   useEffect(() => {
