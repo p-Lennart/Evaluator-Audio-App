@@ -412,33 +412,29 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
             }
           };
 
-          // ===== Cursor Movement Function =====
-          window.stepCursor = function(targetBeats) {
-            console.log("[WebView] stepCursor called with target:", targetBeats);
+          // ===== Cursor Movement Function (LOCKED ANIMATION) =====
+           window.stepCursor = function(targetBeats) {
+            console.log("[WebView] stepCursor called, target:", targetBeats);
 
-            // Cancel any previous loop
+            // Match web: Always cancel and restart
             if (window.__stepLoopId !== null) {
               cancelAnimationFrame(window.__stepLoopId);
               window.__stepLoopId = null;
             }
 
-            // Readiness check
             if (!osm.IsReadyToRender()) {
-              console.warn("[WebView] Please call load() and render() before stepping cursor.");
+              console.warn("[WebView] OSMD not ready");
               return;
             }
 
             const measures = osm.GraphicSheet.MeasureList;
-            if (!measures.length || !measures[0].length) {
-              console.warn("[WebView] No measures found");
-              return;
-            }
+            if (!measures.length || !measures[0].length) return;
 
             const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature.Denominator;
 
-            // Initial beat calculation
+            // Match web: Simple check without separate flag
             let initialBeats = window.__movedBeats;
-            if (initialBeats === 0) {
+            if (window.__movedBeats === 0) {
               const init = osm.cursor.VoicesUnderCursor(osm.Sheet.Instruments[0]);
               if (init.length && init[0].Notes.length) {
                 const len = init[0].Notes[0].Length;
@@ -452,37 +448,33 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
             let moved = window.__movedBeats + window.__overshootBeats;
             window.__overshootBeats = 0;
 
-            // Recursive step function
             function stepFn() {
-              // Check if target reached
               if (moved >= toMove) {
                 const leftover = moved - toMove;
                 window.__overshootBeats = leftover;
                 window.__movedBeats = toMove;
                 osm.render();
-                console.log("[WebView] Cursor reached target:", toMove);
                 return;
               }
 
-              // Advance cursor
               osm.cursor.next();
               const cur = osm.cursor.VoicesUnderCursor(osm.Sheet.Instruments[0]);
               let delta = 0;
+              
               if (cur.length && cur[0].Notes.length) {
                 const len = cur[0].Notes[0].Length;
                 const num = len.Numerator === 0 ? 1 : len.Numerator;
                 delta = (num / len.Denominator) * denom;
               }
+
               moved += delta;
               window.__movedBeats = moved;
 
               osm.render();
-              // Schedule next frame
               window.__stepLoopId = requestAnimationFrame(stepFn);
             }
 
-            // Start the animation loop
-            window.__stepLoopId = requestAnimationFrame(stepFn);
+            stepFn();
           };
 
           // ===== Extract Tempo from XML =====
