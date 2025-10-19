@@ -81,7 +81,19 @@ export default function ScoreFollowerTest({
     setLiveFile(file);
   }
 
-  const runIntonation = async () => {
+  const testIntonationButton = async () => {
+    console.log("-- Testing intonation button pressed");
+    const testSequence = 
+      [0,0,0,0,0,0,0,0,0,0,0].map(
+        (val, idx) => intonationToNoteColor((idx % 3) - 1, idx)
+        );
+      console.log ("-- Test sequence:", testSequence);
+
+      dispatch({
+        type: "SET_NOTE_COLORS",
+        payload: testSequence,
+      });
+
     // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
     // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
 
@@ -185,7 +197,7 @@ export default function ScoreFollowerTest({
           refTimes,
           true,
           false
-        );
+        ).map((val, idx) => refTimes[idx]); // TEMP TEST
 
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
@@ -262,6 +274,11 @@ export default function ScoreFollowerTest({
               return intonationToNoteColor(row.intonation, 0 + idx);
             });
 
+            noteColors.push({
+              color: "#FFFFFF",
+              index: nextIndexRef.current,
+            });
+
             dispatch({
               type: "SET_NOTE_COLORS",
               payload: noteColors,
@@ -303,7 +320,7 @@ export default function ScoreFollowerTest({
   return (
     <View>
       {/* Test intonation Performance button */}
-      <TouchableOpacity style={[styles.button]} onPress={runIntonation}>
+      <TouchableOpacity style={[styles.button]} onPress={testIntonationButton}>
         <Text style={styles.buttonText}>{"Test intonation"}</Text>
       </TouchableOpacity>
       {/* End test intonation button */}
