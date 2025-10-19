@@ -3,7 +3,6 @@ import {
   StyleSheet,
   Text,
   View,
-  SafeAreaView,
   TouchableOpacity,
   useWindowDimensions,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   Platform,
 } from "react-native";
 import React, { useEffect, useReducer, useRef, useState } from "react";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Score_Select } from "./src/components/ScoreSelect";
 import reducer_function from "./src/store/Dispatch";
 import ScoreDisplay from "./src/components/ScoreDisplay";
@@ -167,7 +167,7 @@ export default function App() {
         { backgroundColor: width < height ? "#2C3E50" : "" },
       ]}
     >
-      {/* Account for top padding on Iphone */}
+      {/* Account for top padding on mobile */}
       <SafeAreaView>
         {/* Header with image */}
         <Animated.View
