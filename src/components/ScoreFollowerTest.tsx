@@ -197,8 +197,8 @@ export default function ScoreFollowerTest({
           refTimes,
           true,
           false
-        ).map((val, idx) => refTimes[idx]); // TEMP TEST
-
+        )
+          
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
           ...row,
