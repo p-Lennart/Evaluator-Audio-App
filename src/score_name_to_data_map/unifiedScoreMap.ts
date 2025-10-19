@@ -1,58 +1,69 @@
 import { Platform } from "react-native";
 import { Asset } from "expo-asset";
 
+interface AssetMap {
+  web: string;           // Web path (public folder)
+  ios: any;              // iOS Expo asset require()
+  android: any;          // Android Expo asset require()
+}
+
 interface ScoreDataFiles {
-  refAudio: {
-    web: string;           // Web path (public folder)
-    ios: any;              // iOS Expo asset require()
-    android: any;          // Android Expo asset require()
-  };
-  csvData: {
-    web: string;           
-    ios: any;              
-    android: any;          
-  };
+  refAudio: AssetMap;
+  csvData: AssetMap;
 }
 
 export const unifiedScoreMap: Record<string, ScoreDataFiles> = {
-  air_on_the_g_string: {
+  schumann_melody: {
     refAudio: {
-      web: "/air_on_the_g_string/baseline/instrument_0.wav",
-      ios: require("../../assets/air_on_the_g_string/baseline/instrument_0.wav"),
-      android: require("../../assets/air_on_the_g_string/baseline/instrument_0.wav")
+      web: "/schumann_melody/live.wav",
+      ios: require("../../assets/schumann_melody/live.wav"),
+      android: require("../../assets/schumann_melody/live.wav"),
     },
     csvData: {
-      web: "/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv", 
-      ios: require("../../assets/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv"),
-      android: require("../../assets/air_on_the_g_string/baseline/aotgs_solo_100bpm.csv")
-    }
+      web: "/schumann_melody/schumann_melody_4sec.csv",
+      ios: require("../../assets/schumann_melody/schumann_melody_4sec.csv"),
+      android: require("../../assets/schumann_melody/schumann_melody_4sec.csv"),
+    },
   },
 
-  schumann_melodyVLCduet: {
+  go_tell_aunt_rhody: {
     refAudio: {
-      web: "/schumann_melodyVLCduet/baseline/instrument_0.wav",
-      ios: require("../../assets/schumann_melodyVLCduet/baseline/instrument_0.wav"),
-      android: require("../../assets/schumann_melodyVLCduet/baseline/instrument_0.wav")
+      web: "/go_tell_aunt_rhody/5_go_tell_aunt_rhody-Violoncello50_ref.wav",
+      ios: require("../../assets/go_tell_aunt_rhody/5_go_tell_aunt_rhody-Violoncello50_ref.wav"),
+      android: require("../../assets/go_tell_aunt_rhody/5_go_tell_aunt_rhody-Violoncello50_ref.wav"),
     },
     csvData: {
-      web: "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv",
-      ios: require("../../assets/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv"),
-      android: require("../../assets/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv")
-    }
+      web: "/go_tell_aunt_rhody/5_go_tell_aunt_rhody_50_performance.csv",
+      ios: require("../../assets/go_tell_aunt_rhody/5_go_tell_aunt_rhody_50_performance.csv"),
+      android: require("../../assets/go_tell_aunt_rhody/5_go_tell_aunt_rhody_50_performance.csv"),
+    },
+  },
+
+  air_on_the_g_string: {
+    refAudio: {
+      web: "/air_on_the_g_string/aotgs_solo_ref.wav",
+      ios: require("../../assets/air_on_the_g_string/aotgs_solo_ref.wav"),
+      android: require("../../assets/air_on_the_g_string/aotgs_solo_ref.wav"),
+    },
+    csvData: {
+      web: "/air_on_the_g_string/aotgs_solo_100bpm.csv",
+      ios: require("../../assets/air_on_the_g_string/aotgs_solo_100bpm.csv"),
+      android: require("../../assets/air_on_the_g_string/aotgs_solo_100bpm.csv"),
+    },
   },
 
   ode_to_joy: {
     refAudio: {
-      web: "/ode_to_joy/baseline/instrument_0.wav", 
-      ios: require("../../assets/ode_to_joy/baseline/instrument_0.wav"),
-      android: require("../../assets/ode_to_joy/baseline/instrument_0.wav")
+      web: "/ode_to_joy/o2j_ref.wav",
+      ios: require("../../assets/ode_to_joy/o2j_ref.wav"),
+      android: require("../../assets/ode_to_joy/o2j_ref.wav"),
     },
     csvData: {
-      web: "/ode_to_joy/baseline/ode_to_joy_300bpm.csv",
-      ios: require("../../assets/ode_to_joy/baseline/ode_to_joy_300bpm.csv"),
-      android: require("../../assets/ode_to_joy/baseline/ode_to_joy_300bpm.csv")
-    }
-  }
+      web: "/ode_to_joy/ode_to_joy_300bpm_NEW.csv",
+      ios: require("../../assets/ode_to_joy/ode_to_joy_300bpm_NEW.csv"),
+      android: require("../../assets/ode_to_joy/ode_to_joy_300bpm_NEW.csv"),
+    },
+  },
 };
 
 const getPlatformAsset = (assets: {web: string, ios: any, android: any}): string | any => {
