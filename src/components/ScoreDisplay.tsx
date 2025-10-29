@@ -38,6 +38,7 @@ export default function ScoreDisplay({
   const movedBeats = useRef<number>(0); // ref to store current beat position (used ref instead of state to prevent multiple refreshes)
   const animRef = useRef<number | null>(null); // ref to store current animation id
   const overshootBeats = useRef<number>(0); // How much beat value have we gone over by when going to next note and adding it's beat value (can ignore this - variable probably always 0 due to new implementation of movement logic)
+  const renderSequenceRef = useRef<number>(0);
 
   // Determine if we need to update styles if screen is below a certain threshold
   const { width, height } = useWindowDimensions();
@@ -98,6 +99,9 @@ export default function ScoreDisplay({
         const leftover = moved - toMove;
         overshootBeats.current = leftover;
         movedBeats.current = toMove;
+        const renderSeq = renderSequenceRef.current++;
+        const renderTime = Date.now();
+        console.log(`[Cursor Render] Beat=${movedBeats.current}, RenderTime=${renderTime}`);
         osdRef.current!.render(); // Re-render the music sheet
         return;
       }
@@ -112,6 +116,8 @@ export default function ScoreDisplay({
       moved += delta; // Accumulate the moved beats
       movedBeats.current = moved; // Update reference
 
+      const renderTime = Date.now();
+      console.log(`[Cursor Render] Beat=${movedBeats.current}, RenderTime=${renderTime}`);
       osdRef.current!.render(); // Re-render to reflect the cursor's new position
       animRef.current = requestAnimationFrame(stepFn); // Schedule a new animation frame and store its ID (better alternative to setTimeout)
     };
@@ -140,6 +146,7 @@ export default function ScoreDisplay({
     applyNoteColors(osmd, state.noteColors);
 }
 
+/*
   // Cursor movement effect
   useEffect(() => {
     const beat = state.estimatedBeat; // Get beat from global state
@@ -152,6 +159,79 @@ export default function ScoreDisplay({
     if (steps === "") return; // Chained useeffect to have steps state updated properly before running the cursor movement logic
     moveCursorByBeats(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
+
+*/
+  useEffect(() => {
+    const beat = state.estimatedBeat;
+    if (typeof beat !== "number") return;
+    
+    // Cancel any previous animation
+    if (animRef.current !== null) {
+      cancelAnimationFrame(animRef.current);
+    }
+    
+    // Move cursor directly without intermediate state
+    const targetBeats = beat;
+    
+    // Mobile
+    if (Platform.OS !== "web") {
+      webviewRef.current?.postMessage(JSON.stringify({
+        type: "moveCursor",
+        targetBeats: targetBeats,
+      }));
+      return;
+    }
+    
+    // Web - inline the moveCursorByBeats logic
+    if (!osdRef.current?.IsReadyToRender()) return;
+    
+    const measures = osdRef.current.GraphicSheet.MeasureList;
+    if (!measures.length || !measures[0].length) return;
+    
+    const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature!.Denominator;
+    
+    let initialBeats = movedBeats.current;
+    if (movedBeats.current === 0) {
+      initialBeats = peekAtCurrentBeat(
+        cursorRef.current!,
+        osdRef.current.Sheet.Instruments,
+        denom,
+      );
+    }
+    movedBeats.current = initialBeats;
+    
+    const toMove = Math.max(0, targetBeats);
+    let moved = movedBeats.current + overshootBeats.current;
+    overshootBeats.current = 0;
+    
+    const stepFn = () => {
+      if (moved >= toMove) {
+        const leftover = moved - toMove;
+        overshootBeats.current = leftover;
+        movedBeats.current = toMove;
+        const renderTime = Date.now();
+        const renderSeq = renderSequenceRef.current++;
+        console.log(`[Cursor Render] Beat=${movedBeats.current}, RenderTime=${renderTime}`);
+        osdRef.current!.render();
+        return;
+      }
+      
+      let delta = advanceToNextBeat(
+        cursorRef.current!,
+        osdRef.current!.Sheet.Instruments,
+        denom,
+      );
+      
+      moved += delta;
+      movedBeats.current = moved;
+
+      // Removed logging for intermediate steps
+      osdRef.current!.render();
+      animRef.current = requestAnimationFrame(stepFn);
+    };
+    stepFn();
+  }, [state.estimatedBeat]);
+
 
   // Web-only initialization
   useEffect(() => {

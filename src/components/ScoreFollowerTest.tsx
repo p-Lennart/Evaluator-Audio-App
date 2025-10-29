@@ -60,6 +60,7 @@ export default function ScoreFollowerTest({
   const [performanceComplete, setPerformanceComplete] = useState(false); // State to determine if plackback of a score is finished or not
   const [performanceSaved, setPerformanceSaved] = useState(false); // State to track if performance has been saved
   const isWeb = Platform.OS === "web"; // Boolean indicating if user is on website version or not
+  const dispatchSequenceRef = useRef<number>(0);
 
   // Unload the sound when the component unmounts to free up memory
   useEffect(() => {
@@ -187,13 +188,73 @@ export default function ScoreFollowerTest({
           false
         );
 
+        console.log("=== PETER'S DEBUG TEST ACTIVE ===");
+        console.log("Perfect timestamps mode enabled - using refTimes directly");
+        console.log("Expected result: cursor should move in perfect sync with audio");
+        console.log("Sample refTimes:", refTimes.slice(0, 5));
+        console.log("Sample predictedTimes:", predictedTimes.slice(0, 5));
+        console.log("Are they identical?", JSON.stringify(refTimes.slice(0, 5)) === JSON.stringify(predictedTimes.slice(0, 5)));
+
         // Update CSV struct arr with predicted live times for each note
         csvDataRef.current = csvDataRef.current.map((row, i) => ({
           ...row,
           predictedTime: predictedTimes[i],
         }));
 
-        console.log("New table", csvDataRef.current);
+        //console.log("New table", csvDataRef.current);
+
+        console.log("Using perfect timestamps (refTimes directly)");
+        const timingComparison1 = csvDataRef.current.slice(0, 10).map(row => ({
+          beat: row.beat,
+          refTime: row.refTime,
+          predictedTime: row.predictedTime,
+          difference: row.predictedTime - row.refTime,
+        }));
+        console.log("Perfect timing comparison:", timingComparison1);
+
+        console.log("New table with predicted times:", csvDataRef.current.slice(0, 10)); 
+        console.log("=== TIMING ANALYSIS ===");
+        console.log("Step size (frame duration):", stepSize, "seconds");
+        console.log("Warping path length:", warpingPath.length);
+        console.log("Sample warping path entries:", warpingPath.slice(0, 5));
+        console.log("Sample predicted times:", predictedTimes.slice(0, 10));
+        console.log("Sample reference times:", refTimes.slice(0, 10));
+        const timingDiffs1 = predictedTimes.map((predTime, i) => ({
+          noteIndex: i,
+          refTime: refTimes[i],
+          predictedTime: predTime,
+          difference: predTime - refTimes[i],
+          beat: csvDataRef.current[i]?.beat
+        }));
+        console.log("Timing differences (predicted - reference):", timingDiffs1.slice(0, 10));
+
+
+        console.log("🔬 PETER'S DEBUG TEST RESULTS:");
+        console.log("Using perfect timestamps (refTimes directly)");
+        const timingComparison2 = csvDataRef.current.slice(0, 10).map(row => ({
+          beat: row.beat,
+          refTime: row.refTime,
+          predictedTime: row.predictedTime,
+          difference: row.predictedTime - row.refTime,
+        }));
+        console.log("Perfect timing comparison:", timingComparison2);
+
+        console.log("New table with predicted times:", csvDataRef.current.slice(0, 10)); 
+        console.log("=== TIMING ANALYSIS ===");
+        console.log("Step size (frame duration):", stepSize, "seconds");
+        console.log("Warping path length:", warpingPath.length);
+        console.log("Sample warping path entries:", warpingPath.slice(0, 5));
+        console.log("Sample predicted times:", predictedTimes.slice(0, 10));
+        console.log("Sample reference times:", refTimes.slice(0, 10));
+        const timingDiffs2 = predictedTimes.map((predTime, i) => ({
+          noteIndex: i,
+          refTime: refTimes[i],
+          predictedTime: predTime,
+          difference: predTime - refTimes[i],
+          beat: csvDataRef.current[i]?.beat
+        }));
+        console.log("Timing differences (predicted - reference):", timingDiffs2.slice(0, 10));
+
 
         const scorePitchesCol = csvDataRef.current.map((r) => r.midi);
         const intonationParams = [1024, 512];
@@ -240,6 +301,10 @@ export default function ScoreFollowerTest({
         const currentTimeSec = status.positionMillis / 1000; // Convert current playback time from milliseconds to seconds
 
         let iterations = 0;
+        /*
+        console.log("Tick", currentTimeSec, nextIndexRef.current < csvDataRef.current.length, currentTimeSec >=
+            csvDataRef.current[nextIndexRef.current].predictedTime);
+
         while (
           // Process only if the frame is within bounds and we have passed a predicted time of current csv row
           nextIndexRef.current < csvDataRef.current.length &&
@@ -263,6 +328,77 @@ export default function ScoreFollowerTest({
           } 
 
           nextIndexRef.current++; // Go to next row of csv
+        }
+        */
+        // Enhanced logging for debugging cursor lag
+        const nextIndex = nextIndexRef.current;
+        const hasMoreNotes = nextIndex < csvDataRef.current.length;
+        const nextNote = hasMoreNotes ? csvDataRef.current[nextIndex] : null;
+        const nextPredictedTime = nextNote?.predictedTime;
+        const timeCondition = hasMoreNotes && currentTimeSec >= nextPredictedTime;
+        
+        // Detailed logging every tick
+        console.log(`=== PLAYBACK TICK ===`);
+        console.log(`Current time: ${currentTimeSec.toFixed(3)}s`);
+        console.log(`Next note index: ${nextIndex}/${csvDataRef.current.length}`);
+        if (nextNote) {
+          console.log(`Next note beat: ${nextNote.beat}, predicted time: ${nextPredictedTime?.toFixed(3)}s`);
+          console.log(`Time difference: ${(currentTimeSec - nextPredictedTime).toFixed(3)}s`);
+          console.log(`Should dispatch: ${timeCondition}`);
+        }
+
+/*
+        while (
+          nextIndexRef.current < csvDataRef.current.length &&
+          currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
+        ) {
+          const currentNote = csvDataRef.current[nextIndexRef.current];
+          const beat = currentNote.beat;
+          const pitch = currentNote.intonation;
+          const dispatchTime = Date.now();
+          const audioTime = currentTimeSec;
+          const predictedTime = currentNote.predictedTime;
+          const diff = audioTime - predictedTime;
+          const dispatchSeq = dispatchSequenceRef.current++;
+          console.log(`Dispatch Timing: Audio=${audioTime.toFixed(3)}s, Predicted=${predictedTime.toFixed(3)}s, Diff=${(diff*1000).toFixed(1)}ms, Beat=${beat}`);
+          console.log(`🎵 DISPATCHING BEAT UPDATE: ${beat} at time ${currentTimeSec.toFixed(3)}s (predicted: ${currentNote.predictedTime.toFixed(3)}s), DispatchTime=${dispatchTime}`);
+          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
+          const dispatchDelay = Date.now() - dispatchTime;
+          console.log(`Cursor Dispatch: Beat ${beat} dispatched with ${dispatchDelay}ms delay`);
+          nextIndexRef.current++;
+        }
+*/
+
+        // Collect all beats that should trigger in this tick
+        const beatsToProcess: number[] = [];
+        let lastNote = null;
+
+        while (
+          nextIndexRef.current < csvDataRef.current.length &&
+          currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
+        ) {
+          const currentNote = csvDataRef.current[nextIndexRef.current];
+          beatsToProcess.push(currentNote.beat);
+          lastNote = currentNote;
+          nextIndexRef.current++;
+        }
+
+        // Only dispatch once with the LAST beat
+        if (beatsToProcess.length > 0 && lastNote) {
+          const beat = lastNote.beat;
+          const dispatchTime = Date.now();
+          const audioTime = currentTimeSec;
+          const predictedTime = lastNote.predictedTime;
+          const diff = audioTime - predictedTime;
+          
+          console.log(`Batched ${beatsToProcess.length} beats: [${beatsToProcess.join(', ')}] → dispatching final beat: ${beat}`);
+          console.log(`Dispatch Timing: Audio=${audioTime.toFixed(3)}s, Predicted=${predictedTime.toFixed(3)}s, Diff=${(diff*1000).toFixed(1)}ms, Beat=${beat}`);
+          console.log(`🎵 DISPATCHING BEAT UPDATE: ${beat} at time ${currentTimeSec.toFixed(3)}s (predicted: ${predictedTime.toFixed(3)}s), DispatchTime=${dispatchTime}`);
+          
+          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
+          
+          const dispatchDelay = Date.now() - dispatchTime;
+          console.log(`Cursor Dispatch: Beat ${beat} dispatched with ${dispatchDelay}ms delay`);
         }
 
         // Handle end of playback
