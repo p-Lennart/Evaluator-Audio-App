@@ -90,12 +90,7 @@ async function calculateF0s(
           Array.from(window),
         );
 
-        if (detectedFrequency === -1) {
-          // Reuse last pitch if no pitch is detected
-          f0s.push(f0s.last())
-        } else {
-          f0s.push(detectedFrequency);
-        }
+        f0s.push(detectedFrequency === -1 ? null : detectedFrequency);
       } catch (e) {
         console.error(
           "Android native pitch detection failed, falling back to JS library",

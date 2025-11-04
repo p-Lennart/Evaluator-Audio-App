@@ -181,25 +181,23 @@ export class CENSFeatures extends Features<number[]> {
    * @returns An array of length 12 representing the CENS chroma features for this frame.
    */
   async makeFeature(y: number[]): Promise<number[]> {
-    this.ensureHanningWindow();
-
     const n_fft = this.winLen;
     if (y.length !== n_fft) {
       throw new Error(
         `Input frame length ${y.length} does not match expected length ${n_fft}.`,
       );
     }
-    // 1) Apply Hann window to the audio frame
-    const sig = new Array(n_fft);
-    for (let i = 0; i < n_fft; i++) {
-      sig[i] = (y as any)[i] * this.hanningWindow[i];
-    }
-    // 2) Compute magnitude spectrum using FFT (real FFT since input is real)
-    // Use fft-js to compute FFT. It returns an array of [real, imag] pairs.
+
+    this.ensureHanningWindow();
 
     let phasors: [number, number][];
     if (Platform.OS === "android") {
       try {
+        const sig = new Array(n_fft);
+        for (let i = 0; i < n_fft; i++) {
+          sig[i] = (y as any)[i];
+        }
+
         const fftResult: number[] = await FFTModule.fft(sig);
         phasors = [[fftResult[0], 0]];
 
@@ -209,13 +207,18 @@ export class CENSFeatures extends Features<number[]> {
 
         phasors.push([fftResult[1], 0]);
       } catch (e) {
-        console.error(
-          "Android native fft failed, falling back to JS library",
-          e,
-        );
-        phasors = fft(sig);
+        console.error("Android native fft failed", e);
       }
     } else {
+      // 1) Apply Hann window to the audio frame
+
+      const sig = new Array(n_fft);
+      for (let i = 0; i < n_fft; i++) {
+        sig[i] = (y as any)[i] * this.hanningWindow[i];
+      }
+
+      // 2) Compute magnitude spectrum using FFT (real FFT since input is real)
+      // Use fft-js to compute FFT. It returns an array of [real, imag] pairs.
       phasors = fft(sig);
     }
 

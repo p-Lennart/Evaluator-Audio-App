@@ -8,6 +8,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.Arguments
 import be.tarsos.dsp.util.fft.FFT
+import be.tarsos.dsp.util.fft.HannWindow
 import kotlin.FloatArray
 
 class FFTModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -16,7 +17,7 @@ class FFTModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     @ReactMethod
     fun fft(signalDataIn: ReadableArray, promise: Promise) {
         try {
-            val fftLib = FFT(signalDataIn.size())
+            val fftLib = FFT(signalDataIn.size(), HannWindow())
 
             val signalData = FloatArray(signalDataIn.size())
             for (i in signalData.indices) {
