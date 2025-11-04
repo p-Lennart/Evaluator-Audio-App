@@ -3,7 +3,6 @@ import {
   StyleSheet,
   Text,
   View,
-  SafeAreaView,
   TouchableOpacity,
   useWindowDimensions,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   Platform,
 } from "react-native";
 import React, { useEffect, useReducer, useRef, useState } from "react";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Score_Select } from "./src/components/ScoreSelect";
 import reducer_function from "./src/store/Dispatch";
 import ScoreDisplay from "./src/components/ScoreDisplay";
@@ -25,6 +25,9 @@ import {
   stopLiveAudio,
 } from "./src/utils/liveMicUtils";
 import { useThemeAnimations } from "./src/utils/themeUtils";
+import LoginScreen from "./src/components/LoginScreen";
+import PerformanceStats from "./src/components/PerformanceStats";
+import { getCurrentUser, logoutUser } from "./src/utils/accountUtils";
 
 // Define the main application component
 export default function App() {
@@ -57,6 +60,9 @@ export default function App() {
 
   const [chroma, setChroma] = useState<number[]>(new Array(12).fill(0)); // Initialize the chroma state as an array of 12 zeros (used to capture chroma vector at each chunk of audio).
   const [started, setStarted] = useState(false); // State used to determine user toggled the live microphone option or not
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // State to track if user is logged in
+  const [showStats, setShowStats] = useState(false); // State to toggle statistics view
+  const [currentUser, setCurrentUser] = useState<string | null>(null); // State to store current username
 
   const processor = useRef(new ExpoMicProcessor()).current; // Create a stable ExpoMicProcessor instance
   const SAMPLE_RATE = 44100; // Define sample rate for ChromaMaker
@@ -95,6 +101,61 @@ export default function App() {
   const { width, height } = useWindowDimensions(); // Get device's width
   const isSmallScreen = width < 960; // Boolean used for dynmaic display (row or column)
 
+  // Check if user is logged in on mount
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      const user = await getCurrentUser();
+      if (user) {
+        setIsLoggedIn(true);
+        setCurrentUser(user.username);
+      }
+    };
+    checkLoginStatus();
+  }, []);
+
+  const handleLogin = async () => {
+    const user = await getCurrentUser();
+    if (user) {
+      setIsLoggedIn(true);
+      setCurrentUser(user.username);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setShowStats(false);
+    dispatch({ type: "start/stop" }); // Stop any playing audio
+  };
+
+  // Show login screen if not logged in
+  if (!isLoggedIn) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  // Show statistics view if toggled
+  if (showStats) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={[styles.menu_bar, { height: 60 }]}>
+          <Text style={[styles.logoText, { fontSize: 24 }]}>
+            Statistics - {currentUser}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <TouchableOpacity onPress={() => setShowStats(false)}>
+              <Icon name="x" size={30} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout}>
+              <Icon name="log-out" size={30} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <PerformanceStats />
+      </SafeAreaView>
+    );
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Render the component's UI
   ////////////////////////////////////////////////////////////////////////////////
@@ -106,7 +167,7 @@ export default function App() {
         { backgroundColor: width < height ? "#2C3E50" : "" },
       ]}
     >
-      {/* Account for top padding on Iphone */}
+      {/* Account for top padding on mobile */}
       <SafeAreaView>
         {/* Header with image */}
         <Animated.View
@@ -119,9 +180,25 @@ export default function App() {
           <Text
             style={[styles.logoText, { fontSize: isSmallScreen ? 18 : 32 }]}
           >
-            Evaluator
+            Evaluator - {currentUser}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {/* Statistics button */}
+            <TouchableOpacity onPress={() => setShowStats(true)}>
+              <Icon
+                name="bar-chart-2"
+                size={isSmallScreen ? 15 : 30}
+                color="white"
+              />
+            </TouchableOpacity>
+            {/* Logout button */}
+            <TouchableOpacity onPress={handleLogout}>
+              <Icon
+                name="log-out"
+                size={isSmallScreen ? 15 : 30}
+                color="white"
+              />
+            </TouchableOpacity>
             {/* Light & Dark Mode is disabled for now - due to not looking too good after adding more stuff */}
             <TouchableOpacity
               disabled={true}

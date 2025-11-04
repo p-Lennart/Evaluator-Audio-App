@@ -23,13 +23,11 @@ import { CSVRow, loadCsvInfo } from "../utils/csvParsingUtils";
 import {
   getScoreRefAudio,
   getScoreCSVData,
-  unifiedScoreMap,
+  unifiedScoreMap
 } from "../score_name_to_data_map/unifiedScoreMap";
-import {
-  calculateIntonation,
-  intonationToNoteColor,
-  testIntonation,
-} from "../audio/Intonation";
+
+import { getCurrentUser, savePerformanceData, PerformanceData } from "../utils/accountUtils";
+import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
 import { NoteColor } from "../utils/musicXmlUtils";
 
 interface ScoreFollowerTestProps {
@@ -60,6 +58,7 @@ export default function ScoreFollowerTest({
   const [frameSize, setFrameSize] = useState<number>(0); // State to store frame size of score follower
   const [sampleRate, setSampleRate] = useState<number>(0); // State to store sample rate of score follower
   const [performanceComplete, setPerformanceComplete] = useState(false); // State to determine if plackback of a score is finished or not
+  const [performanceSaved, setPerformanceSaved] = useState(false); // State to track if performance has been saved
   const isWeb = Platform.OS === "web"; // Boolean indicating if user is on website version or not
 
   // Unload the sound when the component unmounts to free up memory
@@ -82,7 +81,19 @@ export default function ScoreFollowerTest({
     setLiveFile(file);
   }
 
-  const runIntonation = async () => {
+  const testIntonationButton = async () => {
+    console.log("-- Testing intonation button pressed");
+    const testSequence =
+      [0,0,0,0,0,0,0,0,0,0,0].map(
+        (val, idx) => intonationToNoteColor((idx % 3) - 1, idx)
+        );
+      console.log ("-- Test sequence:", testSequence);
+
+      dispatch({
+        type: "SET_NOTE_COLORS",
+        payload: testSequence,
+      });
+
     // const audioUri = "/schumann_melodyVLCduet/baseline/instrument_0.wav";
     // const csvUri = "/schumann_melodyVLCduet/baseline/schumann_melody_4sec.csv";
 
@@ -92,10 +103,35 @@ export default function ScoreFollowerTest({
     await testIntonation(audioUri, csvUri, 44100);
   };
 
+  const saveCurrentPerformance = async () => {
+    const user = await getCurrentUser();
+    if (!user) {
+      console.log('No user logged in');
+      alert('Please log in to save performance data');
+      return;
+    }
+
+    const performanceData: PerformanceData = {
+      id: Date.now().toString(),
+      scoreName: score || 'unknown',
+      timestamp: new Date().toISOString(),
+      intonationData: csvDataRef.current.map(row => row.intonation || 0),
+      csvData: csvDataRef.current,
+      warpingPath: pathRef.current,
+      tempo: bpm,
+    };
+
+    await savePerformanceData(performanceData);
+    setPerformanceSaved(true);
+    console.log('Performance saved successfully');
+    alert('Performance saved successfully!');
+  };
+
   const runFollower = async () => {
     if (!score) return; // Do nothing if no score is selected
 
     const base = score.replace(/\.musicxml$/, ""); // Retrieve score name (".musicxml" removal)
+    setPerformanceSaved(false); // Reset saved state when starting new performance
 
     // These booleans are mainly used to disable certain features at certain times
     dispatch({ type: "start/stop" }); // Toggle playing boolean (to true in this case)
@@ -128,11 +164,9 @@ export default function ScoreFollowerTest({
       console.log("-- Audio data prepared, length=", audioData.length);
 
       console.log("-- Computing alignment path...");
-      pathRef.current = await precomputeAlignmentPath(
-        audioData,
-        frameSize,
-        follower,
-      ); // Compute alignment path
+      console.log("   Live audio URI:", liveFile.uri);
+      console.log("   Ref audio URI:", refUri);
+      pathRef.current = await precomputeAlignmentPath(audioData, frameSize, follower); // Compute alignment path
       console.log("-- Alignment path length=", pathRef.current.length);
 
       // const rawPath = computeOfflineAlignmentPath(refFeatures, audioDataRef.current, FeaturesCls, sr, winLen)
@@ -161,6 +195,8 @@ export default function ScoreFollowerTest({
           warpingPath,
           stepSize,
           refTimes,
+          true,
+          false,
         );
 
         console.log("Predicted times", predictedTimes);
@@ -171,12 +207,14 @@ export default function ScoreFollowerTest({
           predictedTime: predictedTimes[i],
         }));
 
+        console.log("New table", csvDataRef.current);
+
         const scorePitchesCol = csvDataRef.current.map((r) => r.midi);
         const intonationParams = [1024, 512];
         const intonation = await calculateIntonation(
           audioData,
           scorePitchesCol,
-          refTimes,
+          predictedTimes,
           sr,
           intonationParams[0],
           intonationParams[1],
@@ -238,6 +276,11 @@ export default function ScoreFollowerTest({
               return intonationToNoteColor(row.intonation, 0 + idx);
             });
 
+            noteColors.push({
+              color: "#FFFFFF",
+              index: nextIndexRef.current,
+            });
+
             dispatch({
               type: "SET_NOTE_COLORS",
               payload: noteColors,
@@ -257,7 +300,7 @@ export default function ScoreFollowerTest({
         }
       };
 
-      const soundSource = { uri: liveFile.uri }; // Extract live wav file's uri
+      const soundSource = { uri: liveFile.uri };
       dispatch({ type: "toggle_loading_performance" }); // Toggle loading boolean (to false in this case)
 
       // Create and load the sound object from the live audio URI
@@ -265,7 +308,7 @@ export default function ScoreFollowerTest({
         soundSource, // Pass in the live wav file's uri as argument
         {
           shouldPlay: true, // Automatically start playback once loaded
-          progressUpdateIntervalMillis: 20, // Set how often status updates are triggered
+          progressUpdateIntervalMillis: 10, // Set how often status updates are triggered
         },
         onPlaybackStatusUpdate, // Callback to handle playback progress (frame processing, alignment, etc.)
       );
@@ -279,7 +322,7 @@ export default function ScoreFollowerTest({
   return (
     <View>
       {/* Test intonation Performance button */}
-      <TouchableOpacity style={[styles.button]} onPress={runIntonation}>
+      <TouchableOpacity style={[styles.button]} onPress={testIntonationButton}>
         <Text style={styles.buttonText}>{"Test intonation"}</Text>
       </TouchableOpacity>
       {/* End test intonation button */}
@@ -372,6 +415,21 @@ export default function ScoreFollowerTest({
           {state.playing ? "Running..." : "Play"}
         </Text>
       </TouchableOpacity>
+
+      {/* Save Performance button */}
+      <TouchableOpacity
+        style={[
+          styles.button,
+          styles.saveButton,
+          (!performanceComplete || performanceSaved) && styles.disabledButton,
+        ]}
+        onPress={saveCurrentPerformance}
+        disabled={!performanceComplete || performanceSaved}
+      >
+        <Text style={styles.buttonText}>
+          {performanceSaved ? "Performance Saved ✓" : "Save Performance"}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -383,6 +441,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C3E50",
     borderRadius: 8,
     alignItems: "center",
+  },
+  saveButton: {
+    marginTop: 8,
+    backgroundColor: "#27AE60",
   },
   disabledButton: {
     backgroundColor: "#555",

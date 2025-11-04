@@ -19,6 +19,7 @@ import {
   onHandleOsmdMessageForNative,
   peekAtCurrentBeat,
 } from "../utils/osmdUtils"; // Helper functions used to manipulate the OSMD Display
+import { NoteColor } from '../utils/musicXmlUtils';
 
 export default function ScoreDisplay({
   state,
@@ -52,9 +53,10 @@ export default function ScoreDisplay({
 
     // MOBILE branch: send JS into the WebView to move the cursor (same logic as the web one, can be seen from buildOsmdHtmlForNative helper function)
     if (Platform.OS !== "web") {
-      webviewRef.current?.injectJavaScript(
-        `window.stepCursor(${parseFloat(steps)}); true;`,
-      );
+      webviewRef.current?.postMessage(JSON.stringify({
+        type: "moveCursor",
+        targetBeats: targetBeats,
+      }));
       return;
     }
 
@@ -116,6 +118,30 @@ export default function ScoreDisplay({
     stepFn(); // Start the step loop
   };
 
+  const colorNotesInOSMD = (noteColors: NoteColor[]) => {
+    if (!noteColors || !noteColors.length) return;
+    // MOBILE branch
+    if (Platform.OS !== "web") {
+      console.log("RN->Web message: color notes, len=", noteColors.length);
+      webviewRef.current?.postMessage(JSON.stringify({
+        type: "colorNotes",
+        noteColors: noteColors,
+      }));
+      return;
+    }
+
+    // WEB branch
+    const osmd = osdRef.current;
+    if (!osmd) return;
+    
+    if (!state.noteColors || state.noteColors.length === 0) {
+      // clear colors if want to reset: applyNoteColors(osmd, []);
+      return;
+    }
+
+    applyNoteColors(osmd, state.noteColors);
+}
+
   // Cursor movement effect
   useEffect(() => {
     const beat = state.estimatedBeat; // Get beat from global state
@@ -148,15 +174,7 @@ export default function ScoreDisplay({
 
   // Runtime refresh
   useEffect(() => {
-    const osmd = osdRef.current;
-    if (!osmd) return;
-
-    if (!state.noteColors || state.noteColors.length === 0) {
-      // clear colors if want to reset: applyNoteColors(osmd, []);
-      return;
-    }
-
-    applyNoteColors(osmd, state.noteColors);
+    colorNotesInOSMD(state.noteColors);
   }, [state.noteColors]);
 
   return (
