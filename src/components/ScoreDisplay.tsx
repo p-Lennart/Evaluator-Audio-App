@@ -101,7 +101,7 @@ export default function ScoreDisplay({
         movedBeats.current = toMove;
         const renderSeq = renderSequenceRef.current++;
         const renderTime = Date.now();
-        console.log(`[Cursor Render] Beat=${movedBeats.current}, RenderTime=${renderTime}`);
+        console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
         osdRef.current!.render(); // Re-render the music sheet
         return;
       }
@@ -117,11 +117,68 @@ export default function ScoreDisplay({
       movedBeats.current = moved; // Update reference
 
       const renderTime = Date.now();
-      console.log(`[Cursor Render] Beat=${movedBeats.current}, RenderTime=${renderTime}`);
+      console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
       osdRef.current!.render(); // Re-render to reflect the cursor's new position
       animRef.current = requestAnimationFrame(stepFn); // Schedule a new animation frame and store its ID (better alternative to setTimeout)
     };
     stepFn(); // Start the step loop
+  };
+
+  const moveCursorByBeatsDirectJump = () => {
+    const targetBeats = parseFloat(steps);
+
+    if (animRef.current !== null) {
+      cancelAnimationFrame(animRef.current);
+    }
+
+    if (Platform.OS !== "web") {
+      webviewRef.current?.postMessage(JSON.stringify({
+        type: "moveCursor",
+        targetBeats: targetBeats,
+      }));
+      return;
+    }
+
+    if (!osdRef.current!.IsReadyToRender()) {
+      console.warn("Please call load() and render() before stepping cursor.");
+      return;
+    }
+
+    const measures = osdRef.current!.GraphicSheet.MeasureList;
+    if (!measures.length || !measures[0].length) return;
+
+    const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature!.Denominator;
+
+    let initialBeats = movedBeats.current;
+    if (movedBeats.current === 0) {
+      initialBeats = peekAtCurrentBeat(
+        cursorRef.current!,
+        osdRef.current!.Sheet.Instruments,
+        denom,
+      );
+    }
+    movedBeats.current = initialBeats;
+
+    const toMove = Math.max(0, targetBeats);
+    let moved = movedBeats.current + overshootBeats.current;
+    overshootBeats.current = 0;
+
+    // Jump directly without intermediate renders
+    while (moved < toMove) {
+      let delta = advanceToNextBeat(
+        cursorRef.current!,
+        osdRef.current!.Sheet.Instruments,
+        denom,
+      );
+      moved += delta;
+    }
+
+    movedBeats.current = moved;
+    overshootBeats.current = moved - toMove;
+    
+    const renderTime = Date.now();
+    console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
+    osdRef.current!.render(); // Single render at end
   };
 
   const colorNotesInOSMD = (noteColors: NoteColor[]) => {
@@ -146,7 +203,7 @@ export default function ScoreDisplay({
     applyNoteColors(osmd, state.noteColors);
 }
 
-/*
+
   // Cursor movement effect
   useEffect(() => {
     const beat = state.estimatedBeat; // Get beat from global state
@@ -157,10 +214,10 @@ export default function ScoreDisplay({
   // Chained cursor movement effect
   useEffect(() => {
     if (steps === "") return; // Chained useeffect to have steps state updated properly before running the cursor movement logic
-    moveCursorByBeats(); // Cursor movement using the latest step
+    moveCursorByBeatsDirectJump(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 
-*/
+/*
   useEffect(() => {
     const beat = state.estimatedBeat;
     if (typeof beat !== "number") return;
@@ -231,7 +288,77 @@ export default function ScoreDisplay({
     };
     stepFn();
   }, [state.estimatedBeat]);
+*/
 
+  useEffect(() => {
+    const beat = state.estimatedBeat;
+    
+    // Early exit if beat is invalid
+    if (typeof beat !== "number") return;
+    
+    const targetBeats = beat;
+    console.log(`Target beat requested: ${targetBeats}`);
+
+    // Cancel any previous animation
+    if (animRef.current !== null) {
+      cancelAnimationFrame(animRef.current);
+    }
+
+    // MOBILE branch
+    if (Platform.OS !== "web") {
+      webviewRef.current?.postMessage(JSON.stringify({
+        type: "moveCursor",
+        targetBeats: targetBeats,
+      }));
+      return;
+    }
+
+    // --- WEB branch ---
+    if (!osdRef.current?.IsReadyToRender()) {
+      console.warn("Please call load() and render() before stepping cursor.");
+      return;
+    }
+
+    const measures = osdRef.current.GraphicSheet.MeasureList;
+    if (!measures.length || !measures[0].length) return;
+
+    const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature!.Denominator;
+
+    let initialBeats = movedBeats.current;
+    if (movedBeats.current === 0) {
+      initialBeats = peekAtCurrentBeat(
+        cursorRef.current!,
+        osdRef.current.Sheet.Instruments,
+        denom,
+      );
+    }
+    movedBeats.current = initialBeats;
+
+    const toMove = Math.max(0, targetBeats);
+    let moved = movedBeats.current + overshootBeats.current;
+    overshootBeats.current = 0;
+
+    console.log(`Moving cursor: from ${movedBeats.current} to ${targetBeats}`);
+
+    // Direct jump without intermediate renders
+    while (moved < toMove) {
+      let delta = advanceToNextBeat(
+        cursorRef.current!,
+        osdRef.current.Sheet.Instruments,
+        denom,
+      );
+      moved += delta;
+    }
+
+    movedBeats.current = moved;
+    overshootBeats.current = moved - toMove;
+    
+    const renderSeq = renderSequenceRef.current++;
+    const renderTime = Date.now();
+    
+    console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}, Seq=${renderSeq}`);
+    osdRef.current.render();
+  }, [state.estimatedBeat]);
 
   // Web-only initialization
   useEffect(() => {

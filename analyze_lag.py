@@ -40,20 +40,24 @@ def parse_cursor_logs(file_path):
     
     if has_seq:
         print("✅ Sequence numbers detected - using precise matching")
-        lags, matched_beats = match_by_sequence(dispatches, renders)
+        lags, matched_beats, unmatched = match_by_sequence(dispatches, renders)
     else:
-        print("⚠️  No sequence numbers - using timestamp-based matching")
+        print("⚠️  No sequence numbers - using IMPROVED timestamp-based matching")
         print("   (Add Seq logging for more accurate analysis)")
-        lags, matched_beats = match_by_timestamp(dispatches, renders)
+        lags, matched_beats, unmatched = match_by_timestamp_improved(dispatches, renders)
     
     if not lags:
         print("\n❌ No matching dispatch-render pairs found!")
+        print("\n🔍 DEBUG INFO:")
+        print(f"First 5 dispatches: {dispatches[:5]}")
+        print(f"First 5 renders: {renders[:5]}")
         return
     
     # Statistics
     print(f"\n📊 LAG STATISTICS (Dispatch → Render)")
     print("-"*70)
     print(f"Matched Beat Updates: {len(lags)}")
+    print(f"Unmatched Dispatches: {len(unmatched)}")
     print(f"Best Response Time: {min(lags):.0f}ms")
     print(f"Average Lag: {mean(lags):.1f}ms")
     print(f"Median Lag: {median(lags):.1f}ms")
@@ -98,10 +102,28 @@ def parse_cursor_logs(file_path):
         for beat, d_time, r_time, lag in sorted(neg_matched, key=lambda x: x[3])[:10]:
             print(f"Beat {beat:6.2f}: {lag:4.0f}ms (Render BEFORE Dispatch!)")
     
+    if unmatched:
+        print(f"\n⚠️  UNMATCHED DISPATCHES ({len(unmatched)} total):")
+        print("-"*70)
+        print("These dispatches had no corresponding render:")
+        for beat, d_time in unmatched[:10]:
+            print(f"   Beat {beat:6.2f} dispatched at {d_time}")
+        if len(unmatched) > 10:
+            print(f"   ... and {len(unmatched) - 10} more")
+    
     # Diagnosis
     print(f"\n🔍 DIAGNOSIS:")
     print("-"*70)
     avg_lag = mean([l for l in lags if l >= 0]) if any(l >= 0 for l in lags) else mean(lags)
+    
+    if len(unmatched) > len(lags):
+        print(f"❌ More unmatched dispatches ({len(unmatched)}) than matched ({len(lags)})!")
+        print("   Possible causes:")
+        print("   1. Cursor is using movedBeats.current instead of target beat in logging")
+        print("   2. Multiple dispatches before single render (batching)")
+        print("   3. Renders are happening but beat values don't match")
+        print(f"\n   → Check your logging in moveCursorByBeatsDirectJump()")
+        print(f"   → Should log TARGET beat, not movedBeats.current")
     
     if negative > 0:
         print(f"❌ {negative} negative lags detected!")
@@ -132,6 +154,7 @@ def match_by_sequence(dispatches, renders):
     """Match events using sequence numbers (most accurate)"""
     lags = []
     matched_beats = []
+    unmatched = []
     
     # Build lookups
     dispatch_by_seq = {}
@@ -156,11 +179,19 @@ def match_by_sequence(dispatches, renders):
                 lag = r_time - d_time
                 lags.append(lag)
                 matched_beats.append((d_beat, d_time, r_time, lag))
+        else:
+            d_beat, d_time, _ = dispatch_by_seq[seq]
+            unmatched.append((d_beat, d_time))
     
-    return lags, matched_beats
+    return lags, matched_beats, unmatched
 
-def match_by_timestamp(dispatches, renders):
-    """Match events by timestamp (less accurate, but works without Seq)"""
+def match_by_timestamp_improved(dispatches, renders):
+    """
+    Improved timestamp matching that handles:
+    1. Direct jumps (no intermediate renders)
+    2. Multiple dispatches before one render
+    3. Temporal proximity when beats don't match exactly
+    """
     # Build chronological event lists
     dispatch_events = []
     render_events = []
@@ -175,43 +206,55 @@ def match_by_timestamp(dispatches, renders):
     dispatch_events.sort()
     render_events.sort()
     
-    print(f"\nTimestamp matching strategy:")
-    print(f"  - For each dispatch, find the LAST render of that beat that occurs after dispatch")
-    print(f"  - This handles cases where cursor steps through multiple intermediate beats")
+    print(f"\nImproved matching strategy:")
+    print(f"  - For each dispatch, find the NEAREST render that occurs AFTER dispatch")
+    print(f"  - Within 200ms time window (configurable)")
+    print(f"  - Allows slight beat value differences")
     
     lags = []
     matched_beats = []
     unmatched = []
     used_renders = set()
     
-    # For each dispatch, find the LAST render of the same beat AFTER it
+    MAX_TIME_WINDOW_MS = 200  # Maximum time between dispatch and render
+    
+    # For each dispatch, find the nearest subsequent render
     for d_time, d_beat, audio_time in dispatch_events:
-        # Find ALL renders of this beat that occur after dispatch
-        candidates = []
+        best_match = None
+        best_score = float('inf')
+        
         for i, (r_time, r_beat) in enumerate(render_events):
             if i in used_renders:
                 continue
-            # Same beat (within 0.01), and render happens after dispatch
-            if abs(r_beat - d_beat) < 0.01 and r_time >= d_time:
-                candidates.append((i, r_time, r_beat, r_time - d_time))
+            
+            # Must occur after dispatch
+            if r_time < d_time:
+                continue
+            
+            # Must be within time window
+            time_diff = r_time - d_time
+            if time_diff > MAX_TIME_WINDOW_MS:
+                continue
+            
+            # Calculate matching score (prefer exact beat match and minimal time)
+            beat_diff = abs(r_beat - d_beat)
+            
+            # Score: prioritize temporal proximity, but penalize beat differences
+            score = time_diff + (beat_diff * 50)  # 50ms penalty per beat difference
+            
+            if score < best_score:
+                best_score = score
+                best_match = (i, r_time, r_beat, time_diff)
         
-        if candidates:
-            # Take the LAST render (highest timestamp) of this beat
-            # This is when the cursor actually settled on the target beat
-            candidates.sort(key=lambda x: x[1])  # Sort by render time
-            idx, r_time, r_beat, lag = candidates[-1]  # Take last one
+        if best_match:
+            idx, r_time, r_beat, lag = best_match
             used_renders.add(idx)
             lags.append(lag)
             matched_beats.append((d_beat, d_time, r_time, lag))
         else:
             unmatched.append((d_beat, d_time))
     
-    if unmatched:
-        print(f"\n⚠️  {len(unmatched)} dispatches had no matching render:")
-        for beat, d_time in unmatched[:5]:
-            print(f"   Beat {beat:.2f} dispatched at {d_time}")
-    
-    return lags, matched_beats
+    return lags, matched_beats, unmatched
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

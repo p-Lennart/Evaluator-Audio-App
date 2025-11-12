@@ -378,11 +378,17 @@ export default function ScoreFollowerTest({
           currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
         ) {
           const currentNote = csvDataRef.current[nextIndexRef.current];
-          beatsToProcess.push(currentNote.beat);
-          lastNote = currentNote;
+          const beat = currentNote.beat;
+          const dispatchTime = Date.now();
+          const dispatchSeq = dispatchSequenceRef.current++;
+          
+          console.log(`🎵 DISPATCHING BEAT UPDATE: ${beat} at time ${currentTimeSec.toFixed(3)}s, DispatchTime=${dispatchTime}, Seq=${dispatchSeq}`);
+          
+          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
+          
           nextIndexRef.current++;
         }
-
+/*
         // Only dispatch once with the LAST beat
         if (beatsToProcess.length > 0 && lastNote) {
           const beat = lastNote.beat;
@@ -400,7 +406,7 @@ export default function ScoreFollowerTest({
           const dispatchDelay = Date.now() - dispatchTime;
           console.log(`Cursor Dispatch: Beat ${beat} dispatched with ${dispatchDelay}ms delay`);
         }
-
+*/
         // Handle end of playback
         if (status.didJustFinish) {
           dispatch({ type: "start/stop" }); // Toggle "playing" boolean (to false in this case)
