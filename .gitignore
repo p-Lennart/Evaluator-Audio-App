@@ -41,3 +41,7 @@ yarn-error.*
 
 console_logs.txt
 task_analysis_parser.py
+/android/app/build
+/android/app/.cxx
+/android/.gradle
+/android/build
