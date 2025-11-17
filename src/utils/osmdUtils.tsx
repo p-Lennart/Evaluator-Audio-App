@@ -1,5 +1,10 @@
 import { extractTempo } from "./fileSelectorUtils";
-import { OpenSheetMusicDisplay, Cursor, Fraction, GraphicalNote } from "opensheetmusicdisplay";
+import {
+  OpenSheetMusicDisplay,
+  Cursor,
+  Fraction,
+  GraphicalNote,
+} from "opensheetmusicdisplay";
 import { Platform } from "react-native";
 import scoresData from "../score_name_to_data_map/scoreToMusicxmlMap";
 
@@ -164,7 +169,7 @@ export const peekAtCurrentBeat = (
   return delta;
 };
 
-// Match music21 flatten().notes generated csvs: no rests, all notes (normal, tied, grace) 
+// Match music21 flatten().notes generated csvs: no rests, all notes (normal, tied, grace)
 export function getAllGraphicalNotes(osmd: any): any[] {
   const notes: any[] = [];
   const sheet = osmd.GraphicSheet;
@@ -188,7 +193,10 @@ export function getAllGraphicalNotes(osmd: any): any[] {
   return notes;
 }
 
-export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; color: string }>) {
+export function applyNoteColors(
+  osmd: any,
+  noteColors: Array<{ index: number; color: string }>,
+) {
   if (!osmd) return;
 
   const allNotes = getAllGraphicalNotes(osmd);
@@ -197,7 +205,7 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
 
   // fast lookup map from index -> color
   const colorMap = new Map<number, string>();
-  (noteColors || []).forEach(n => colorMap.set(n.index, n.color));
+  (noteColors || []).forEach((n) => colorMap.set(n.index, n.color));
 
   // Clear previous colors for notes not in map
   // allNotes.forEach((gNote) => {
@@ -232,7 +240,10 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
           vf.setStyle({ fillStyle: color, strokeStyle: color });
         } else if (typeof vf.setAttribute === "function") {
           // Not common, but harmless if present
-          try { vf.setAttribute("fill", color); vf.setAttribute("stroke", color); } catch (e) {}
+          try {
+            vf.setAttribute("fill", color);
+            vf.setAttribute("stroke", color);
+          } catch (e) {}
         } else if (vf.attrs && typeof vf.attrs === "object") {
           // Some VexFlow renderers expose attrs
           vf.attrs.fill = color;
@@ -244,7 +255,6 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
           // If nothing matches, we do nothing to vfnote — rely on sourceNote change above.
         }
       }
-
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn("applyNoteColors: failed for index", idx, err);
@@ -258,7 +268,6 @@ export function applyNoteColors(osmd: any, noteColors: Array<{ index: number; co
     console.error("osmd.render() failed", e);
   }
 }
-
 
 /**
  * Builds the complete HTML string for rendering OSMD inside a **React Native WebView**.
@@ -403,33 +412,29 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
             }
           };
 
-          // ===== Cursor Movement Function =====
-          window.stepCursor = function(targetBeats) {
-            console.log("[WebView] stepCursor called with target:", targetBeats);
+          // ===== Cursor Movement Function (LOCKED ANIMATION) =====
+           window.stepCursor = function(targetBeats) {
+            console.log("[WebView] stepCursor called, target:", targetBeats);
 
-            // Cancel any previous loop
+            // Match web: Always cancel and restart
             if (window.__stepLoopId !== null) {
               cancelAnimationFrame(window.__stepLoopId);
               window.__stepLoopId = null;
             }
 
-            // Readiness check
             if (!osm.IsReadyToRender()) {
-              console.warn("[WebView] Please call load() and render() before stepping cursor.");
+              console.warn("[WebView] OSMD not ready");
               return;
             }
 
             const measures = osm.GraphicSheet.MeasureList;
-            if (!measures.length || !measures[0].length) {
-              console.warn("[WebView] No measures found");
-              return;
-            }
+            if (!measures.length || !measures[0].length) return;
 
             const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature.Denominator;
 
-            // Initial beat calculation
+            // Match web: Simple check without separate flag
             let initialBeats = window.__movedBeats;
-            if (initialBeats === 0) {
+            if (window.__movedBeats === 0) {
               const init = osm.cursor.VoicesUnderCursor(osm.Sheet.Instruments[0]);
               if (init.length && init[0].Notes.length) {
                 const len = init[0].Notes[0].Length;
@@ -443,37 +448,33 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
             let moved = window.__movedBeats + window.__overshootBeats;
             window.__overshootBeats = 0;
 
-            // Recursive step function
             function stepFn() {
-              // Check if target reached
               if (moved >= toMove) {
                 const leftover = moved - toMove;
                 window.__overshootBeats = leftover;
                 window.__movedBeats = toMove;
                 osm.render();
-                console.log("[WebView] Cursor reached target:", toMove);
                 return;
               }
 
-              // Advance cursor
               osm.cursor.next();
               const cur = osm.cursor.VoicesUnderCursor(osm.Sheet.Instruments[0]);
               let delta = 0;
+              
               if (cur.length && cur[0].Notes.length) {
                 const len = cur[0].Notes[0].Length;
                 const num = len.Numerator === 0 ? 1 : len.Numerator;
                 delta = (num / len.Denominator) * denom;
               }
+
               moved += delta;
               window.__movedBeats = moved;
 
               osm.render();
-              // Schedule next frame
               window.__stepLoopId = requestAnimationFrame(stepFn);
             }
 
-            // Start the animation loop
-            window.__stepLoopId = requestAnimationFrame(stepFn);
+            stepFn();
           };
 
           // ===== Extract Tempo from XML =====
@@ -516,35 +517,6 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
         })();
 
         // ===== Message Handler for React Native =====
-        function handleRNMessage(event) {
-          try {
-            const msg = JSON.parse(event.data);
-            console.log("[WebView] RN->WebView message:", msg);
-
-            // Handle note coloring
-            if (msg.type === "colorNotes" && Array.isArray(msg.noteColors)) {
-              window.applyNoteColors(msg.noteColors);
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: "colorNotesAck",
-                count: msg.noteColors.length,
-              }));
-            }
-            
-            // Handle cursor movement
-            else if (msg.type === "moveCursor" && typeof msg.targetBeats === "number") {
-              window.stepCursor(msg.targetBeats);
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: "cursorMovedAck",
-                targetBeats: msg.targetBeats,
-              }));
-            }
-
-          } catch (err) {
-            console.error("[WebView] Bad RN->WebView message", err);
-          }
-        }
-
-                // ===== Message Handler for React Native =====
         function handleRNMessage(event) {
           try {
             // Log raw event for debugging
@@ -629,8 +601,7 @@ export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
       // ---- Color note confirmation ----
       case "colorNotesAck":
         console.log(`[WebView] Applied ${data.count} note color updates`);
-        // Optionally, you could dispatch an action here:
-        // dispatch({ type: "color_notes_applied", count: data.count });
+        // Optional dispatch: dispatch({ type: "color_notes_applied", count: data.count });
         break;
       
       // ---- Cursor movement confirmation ----

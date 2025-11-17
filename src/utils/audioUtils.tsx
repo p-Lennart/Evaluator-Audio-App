@@ -1,4 +1,4 @@
-import waveResampler from "wave-resampler";
+import * as waveResampler from "wave-resampler";
 const wav = require("node-wav");
 
 /**
