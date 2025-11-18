@@ -36,7 +36,7 @@ export function Score_Select({
   // Array of score names used to render the available scores for the app
   // Entries are used within a hashmap to access certain data needed for the selected score
   const musicxmlFiles: string[] = [
-    "schumann_melodyVLCduet.musicxml",
+    "schumann_melody.musicxml",
     "go_tell_aunt_rhody.musicxml",
     "air_on_the_g_string.musicxml",
     "ode_to_joy.musicxml",
