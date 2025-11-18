@@ -552,42 +552,6 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
           }
         }
 
-                // ===== Message Handler for React Native =====
-        function handleRNMessage(event) {
-          try {
-            // Log raw event for debugging
-            console.log("[WebView] Raw event received:", JSON.stringify(event));
-            
-            const msg = JSON.parse(event.data);
-            console.log("[WebView] RN->WebView message:", msg);
-
-            // Handle note coloring
-            if (msg.type === "colorNotes" && Array.isArray(msg.noteColors)) {
-              window.applyNoteColors(msg.noteColors);
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: "colorNotesAck",
-                count: msg.noteColors.length,
-              }));
-            }
-            
-            // Handle cursor movement
-            else if (msg.type === "moveCursor" && typeof msg.targetBeats === "number") {
-              window.stepCursor(msg.targetBeats);
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: "cursorMovedAck",
-                targetBeats: msg.targetBeats,
-              }));
-            }
-
-          } catch (err) {
-            console.error("[WebView] Bad RN->WebView message", err);
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: "error",
-              message: err.toString(),
-            }));
-          }
-        }
-
         // ===== Register Message Listeners =====
         // iOS uses window.addEventListener
         window.addEventListener("message", handleRNMessage);
@@ -637,8 +601,7 @@ export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
       // ---- Color note confirmation ----
       case "colorNotesAck":
         console.log(`[WebView] Applied ${data.count} note color updates`);
-        // Optionally, you could dispatch an action here:
-        // dispatch({ type: "color_notes_applied", count: data.count });
+        // Optional dispatch: dispatch({ type: "color_notes_applied", count: data.count });
         break;
       
       // ---- Cursor movement confirmation ----
