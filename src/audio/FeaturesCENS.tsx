@@ -134,7 +134,7 @@ export class CENSFeatures extends Features<number[]> {
   hanningWindow: number[];
   cFC: number[][]; // conversion matrix from FFT bins to chroma (12) bins
 
-  private ensureHanningWindow() {
+  private async ensureHanningWindow() {
     if (this.hanningWindow) return;
 
     // 1) Create Hann (Hanning) window for FFT
@@ -169,6 +169,10 @@ export class CENSFeatures extends Features<number[]> {
         this.cFC[chroma][j] = sum;
       }
     }
+
+    if (Platform.OS === "android") {
+      await FFTModule.setcFC(this.cFC);
+    }
   }
 
   compareFeatures(vec1: number[], vec2: number[]): number {
@@ -188,24 +192,18 @@ export class CENSFeatures extends Features<number[]> {
       );
     }
 
-    this.ensureHanningWindow();
+    const num_bins = Math.floor(n_fft / 2) + 1;
+    await this.ensureHanningWindow();
 
-    let phasors: [number, number][];
+    let chromaVec: number[];
     if (Platform.OS === "android") {
       try {
         const sig = new Array(n_fft);
         for (let i = 0; i < n_fft; i++) {
-          sig[i] = (y as any)[i];
+          sig[i] = y[i];
         }
 
-        const fftResult: number[] = await FFTModule.fft(sig);
-        phasors = [[fftResult[0], 0]];
-
-        for (let i = 2; i < fftResult.length; i += 2) {
-          phasors.push([fftResult[i], fftResult[i + 1]]);
-        }
-
-        phasors.push([fftResult[1], 0]);
+        chromaVec = await FFTModule.fft(sig);
       } catch (e) {
         console.error("Android native fft failed", e);
       }
@@ -219,28 +217,30 @@ export class CENSFeatures extends Features<number[]> {
 
       // 2) Compute magnitude spectrum using FFT (real FFT since input is real)
       // Use fft-js to compute FFT. It returns an array of [real, imag] pairs.
-      phasors = fft(sig);
+      const phasors = fft(sig);
+
+      // Take the magnitude (absolute value) of FFT output for bins 0..num_bins-1
+      let X = new Array(num_bins);
+      for (let k = 0; k < num_bins; k++) {
+        const re = phasors[k][0];
+        const im = phasors[k][1];
+        X[k] = Math.sqrt(re * re + im * im);
+      }
+
+      // Convert to chroma by projecting the power spectrum onto pitch classes:
+      // We use X**2 (power) for projection (as in Python code X**2).
+      chromaVec = new Array(12).fill(0);
+      for (let i = 0; i < 12; i++) {
+        let sum = 0;
+        for (let j = 0; j < num_bins; j++) {
+          // use power = X[j]^2
+          sum += this.cFC[i][j] * (X[j] * X[j]);
+        }
+        chromaVec[i] = sum;
+      }
     }
 
-    const num_bins = Math.floor(n_fft / 2) + 1;
-    // Take the magnitude (absolute value) of FFT output for bins 0..num_bins-1
-    const X: number[] = new Array(num_bins);
-    for (let k = 0; k < num_bins; k++) {
-      const re = phasors[k][0];
-      const im = phasors[k][1];
-      X[k] = Math.sqrt(re * re + im * im);
-    }
-    // Convert to chroma by projecting the power spectrum onto pitch classes:
-    // We use X**2 (power) for projection (as in Python code X**2).
-    const chromaVec: number[] = new Array(12).fill(0);
-    for (let i = 0; i < 12; i++) {
-      let sum = 0;
-      for (let j = 0; j < num_bins; j++) {
-        // use power = X[j]^2
-        sum += this.cFC[i][j] * (X[j] * X[j]);
-      }
-      chromaVec[i] = sum;
-    }
+    // console.log(chromaVec);
 
     // CENS post-processing steps:
     // Step 1) Normalize by L1 norm (sum of absolute values)
