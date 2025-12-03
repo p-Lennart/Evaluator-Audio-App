@@ -3,22 +3,45 @@ import { RecordingOptions } from "expo-av/build/Audio";
 import { Platform } from "react-native";
 
 /**
- * ExpoMicProcessor continuously captures short chunks of microphone audio,
- * converts them into Float32 samples, and emits them via `onmessage`.
+ * Continuously captures microphone audio in fixed-size chunks and converts
+ * them into raw `Float32Array` PCM frames. When a full buffer of 4096 samples
+ * has been accumulated, the processor emits a message via {@link onmessage}.
+ *
+ * This class uses Expo's `expo-av` recording API. Audio capture occurs by
+ * repeatedly starting a short recording, stopping it after the calculated
+ * duration, decoding the audio, and feeding the samples into an internal
+ * circular buffer.
+ *
+ * @remarks
+ * - iOS receives uncompressed 32-bit float PCM from `.wav` recordings.
+ * - Android AAC decoding is not implemented yet; chunks are skipped.
+ * - Call {@link init} once before {@link start}.
  */
+
 export class ExpoMicProcessor {
-  private _buffer = new Float32Array(4096); // Internal circular buffer to accumulate samples until we have 4096 frames
-  private _bufIndex = 0; // Next write position in the internal buffer
-  private _running = false; // Flag indicating whether capture should continue
+  /**
+   * Internal circular buffer of size 4096 samples. Once full, it triggers
+   * {@link onmessage} and resets.
+   */
+  private _pcmBuffer = new Float32Array(4096);
+  /** Current write index into the circular buffer. */
+  private _writeIndex = 0;
+  /** Indicates whether the capture loop is currently running. */
+  private _isRunning = false;
 
   /**
-   * Callback invoked whenever _buffer fills with 4096 samples.
-   * Receives an object with a Float32Array of length 4096.
-   * Override this to process audio in real time.
+   * Called whenever a complete 4096-sample frame is available.
+   *
+   * @param event.data - A copy of the accumulated Float32Array buffer.
    */
   public onmessage: (event: { data: Float32Array }) => void = () => {};
 
-  // Initialize audio subsystem: request mic permission and configure audio mode. Must be called once before `start`.
+  /**
+   * Requests microphone permissions and configures the global audio mode
+   * needed for continuous recording. Must be invoked before {@link start}.
+   *
+   * @throws If the user denies microphone permissions.
+   */
   public async init() {
     const { granted } = await Audio.requestPermissionsAsync(); // Prompt user for microphone permission
     if (!granted) throw new Error("Microphone permission denied"); // Error handling when microphone is not granted permission
@@ -28,15 +51,27 @@ export class ExpoMicProcessor {
       allowsRecordingIOS: true, // Enable recording on iOS
       playsInSilentModeIOS: true, // Allow playback even when device is silenced
       interruptionModeIOS: InterruptionModeIOS.DoNotMix, // Don't mix with other audio playing on iOS device
-      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix, // Don't mix with other audio on andriod device
-      shouldDuckAndroid: false, // If we didn’t get exclusive focus, don’t fall back to ducking - andriod devices.
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix, // Don't mix with other audio on Android devices.
+      shouldDuckAndroid: false, // If we didn’t get exclusive focus, don’t fall back to ducking - Android devices.
     });
   }
 
-  // Begins the continuous recording loop and records fixed-size chunks (4096 samples) and dispatches them.
+  /**
+   * Begins the continuous recording loop. Short audio recordings are created
+   * back-to-back, each long enough to contain ~4096 samples at 44.1 kHz.
+   *
+   * iOS recordings are decoded into Float32 PCM and accumulated into an
+   * internal circular buffer. When the buffer fills, {@link onmessage} fires.
+   *
+   * @remarks
+   * Android AAC → PCM decoding is not implemented yet. Android chunks are
+   * currently skipped with a warning.
+   *
+   * @throws If {@link init} has not been called or audio mode is not configured.
+   */
   public async start() {
-    if (this._running) return; // Error checking if already recording somewhow before start
-    this._running = true; // Set recording flag to true
+    if (this._isRunning) return; // Error checking if already recording somehow before start
+    this._isRunning = true; // Set recording flag to true
 
     const SAMPLE_RATE = 44100; // The sample rate used across platforms for predictable buffer math
     const chunkMs = (4096 / SAMPLE_RATE) * 1000; // Convert 4096 samples at SAMPLE_RATE into milliseconds
@@ -70,83 +105,88 @@ export class ExpoMicProcessor {
     };
 
     // Capture loop - keep recording chunks until stopped
-    while (this._running) {
+    while (this._isRunning) {
       // Prepare recorder with our options
-      const rec = new Audio.Recording();
-      await rec.prepareToRecordAsync(recordingOptions);
+      const recorder = new Audio.Recording();
+      await recorder.prepareToRecordAsync(recordingOptions);
 
       // Start recording, wait for chunk duration, then stop
-      await rec.startAsync();
+      await recorder.startAsync();
       await new Promise((r) => setTimeout(r, chunkMs));
-      await rec.stopAndUnloadAsync();
+      await recorder.stopAndUnloadAsync();
 
-      const uri = rec.getURI(); // Retrieve file URI for the recorded chunk
-      if (!uri) break; // if URI missing, exit loop
+      const chunkUri = recorder.getURI(); // Retrieve file URI for the recorded chunk
+      if (!chunkUri) break; // if URI missing, exit loop
 
       // Load raw file into memory
-      const arrayBuffer = await fetch(uri).then((r) => r.arrayBuffer());
-      let floats: Float32Array | null = null;
+      const arrayBuffer = await fetch(chunkUri).then((r) => r.arrayBuffer());
+      let pcmSamples: Float32Array | null = null;
 
       // Convert file data to Float32 samples
       if (Platform.OS === "ios") {
-        floats = parseWavToFloat32(arrayBuffer);
+        pcmSamples = parseWavToFloat32(arrayBuffer);
       } else {
         // Android: AAC decoding to PCM not implemented here
         console.warn("Android PCM decode not implemented; skipping chunk.");
       }
 
-      if (floats) {
+      if (pcmSamples) {
         // Push samples into our circular buffer
-        for (let i = 0; i < floats.length; i++) {
-          this._buffer[this._bufIndex++] = floats[i];
+        for (let i = 0; i < pcmSamples.length; i++) {
+          this._pcmBuffer[this._writeIndex++] = pcmSamples[i];
           // When buffer fills, fire onmessage and reset index
-          if (this._bufIndex === 4096) {
+          if (this._writeIndex === 4096) {
             // Pass a copy of the buffer to avoid mutation
-            this.onmessage({ data: this._buffer.slice(0) });
-            this._bufIndex = 0;
+            this.onmessage({ data: this._pcmBuffer.slice(0) });
+            this._writeIndex = 0;
           }
         }
       }
     }
   }
 
-  //Stop the capture loop gracefully.
+  /**
+   * Stops the continuous capture loop. Does not flush partial buffers.
+   */
   public stop() {
-    this._running = false;
+    this._isRunning = false;
   }
 }
 
 /**
- * Parses a WAV file buffer and extracts the raw Float32 samples from the data chunk.
- * Walks over RIFF chunks until it finds 'data', then returns a Float32Array view.
+ * Extracts 32-bit float PCM samples from a WAV file's "data" chunk.
+ *
+ * @param buf - The full WAV file in an `ArrayBuffer`.
+ * @returns A `Float32Array` view of the PCM samples.
+ *
+ * @throws If no "data" chunk is found in the WAV.
  */
-
 function parseWavToFloat32(buf: ArrayBuffer): Float32Array {
-  const dv = new DataView(buf); // Create a DataView to easily read binary data (bytes, integers) from the ArrayBuffer
-  let offset = 12; // The first 12 bytes are the "RIFF" identifier, file size, and "WAVE" identifier
+  const dataView = new DataView(buf); // Create a DataView to easily read binary data (bytes, integers) from the ArrayBuffer
+  let chunkOffset = 12; // The first 12 bytes are the "RIFF" identifier, file size, and "WAVE" identifier
 
   // Loop through the subchunks until we find the "data" chunk
-  while (offset < dv.byteLength) {
+  while (chunkOffset < dataView.byteLength) {
     // Read the 4-character chunk ID
     const id = String.fromCharCode(
-      dv.getUint8(offset),
-      dv.getUint8(offset + 1),
-      dv.getUint8(offset + 2),
-      dv.getUint8(offset + 3),
+      dataView.getUint8(chunkOffset),
+      dataView.getUint8(chunkOffset + 1),
+      dataView.getUint8(chunkOffset + 2),
+      dataView.getUint8(chunkOffset + 3)
     );
 
     // The next 4 bytes tell us how large this chunk’s payload is
-    const size = dv.getUint32(offset + 4, true);
+    const size = dataView.getUint32(chunkOffset + 4, true);
 
     // If this is the "data" chunk, we can extract the raw PCM samples
     if (id === "data") {
       // PCM floats start immediately after the 8-byte header (ID + size)
       // size is in bytes, so divide by 4 to get the number of Float32 samples
-      return new Float32Array(buf, offset + 8, size / 4);
+      return new Float32Array(buf, chunkOffset + 8, size / 4);
     }
 
     // Otherwise skip ahead past this chunk (8 bytes header + payload)
-    offset += 8 + size;
+    chunkOffset += 8 + size;
   }
 
   // If we never saw a "data" chunk, throw an error

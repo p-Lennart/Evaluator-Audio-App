@@ -1,4 +1,3 @@
-// NOTE: Component was only created to obtain wav files from given MIDIs but we no longer need it since we can just get wav files directly
 import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 import { WebView } from "react-native-webview";
@@ -6,13 +5,22 @@ import { Asset } from "expo-asset";
 import * as FileSystem from "expo-file-system";
 
 type Props = {
-  midiModule: number | null; // MIDI module reference number passed in as prop (maps to MIDI file)
-  dispatch?: Function; // Optional dispatch function for sending generated audio URIs back upstream
+  midiModule: number | null; // Bundled MIDI asset reference (e.g. require('...'))
+  dispatch?: Function; // Optional callback for returning generated WAV file URIs
 };
 
+/**
+ * AudioGenerator is a temporary WebView-based audio rendering pipeline.
+ * It loads a bundled MIDI asset, renders both top and bottom voice WAVs
+ * using Tone.js + Soundfont within an isolated WebView, and returns
+ * the generated file URIs through an optional dispatch callback.
+ *
+ * This component is legacy and will be removed once WAV assets
+ * can be pre-generated outside of runtime.
+ */
 const AudioGenerator: React.FC<Props> = ({ midiModule, dispatch }) => {
-  const playWebviewRef = useRef<WebView>(null); // Ref to the playback WebView for sending play commands
-  const genWebviewRef = useRef<WebView>(null); // Ref to the offline generator WebView for WAV rendering
+  const playWebviewRef = useRef<WebView>(null); // WebView used for real-time MIDI playback
+  const genWebviewRef = useRef<WebView>(null); // WebView used for offline WAV rendering
   const [midiBase64, setMidiBase64] = useState<string | null>(null); // Stores Base64-encoded MIDI data
   const [readyToGenerate, setReadyToGenerate] = useState(false); // Indicates generator WebView is ready
 
@@ -197,7 +205,7 @@ const AudioGenerator: React.FC<Props> = ({ midiModule, dispatch }) => {
   useEffect(() => {
     if (readyToGenerate && midiBase64) {
       genWebviewRef.current?.postMessage(
-        JSON.stringify({ type: "generate-wav", data: midiBase64 }),
+        JSON.stringify({ type: "generate-wav", data: midiBase64 })
       );
     }
   }, [readyToGenerate, midiBase64]);
@@ -217,10 +225,10 @@ const AudioGenerator: React.FC<Props> = ({ midiModule, dispatch }) => {
           dispatch?.({
             type: "change_reference_audio",
             referenceAudioUri: topUri,
-          }),
+          })
         )
         .catch((err) =>
-          console.error("[AudioGenerator] write top error:", err),
+          console.error("[AudioGenerator] write top error:", err)
         );
 
       FileSystem.writeAsStringAsync(bottomUri, msg.bottom, {
@@ -230,10 +238,10 @@ const AudioGenerator: React.FC<Props> = ({ midiModule, dispatch }) => {
           dispatch?.({
             type: "change_bottom_audio",
             bottomAudioUri: bottomUri,
-          }),
+          })
         )
         .catch((err) =>
-          console.error("[AudioGenerator] write bottom error:", err),
+          console.error("[AudioGenerator] write bottom error:", err)
         );
     } else if (msg.type === "ready-to-generate") {
       setReadyToGenerate(true); // Generator WebView signaled readiness

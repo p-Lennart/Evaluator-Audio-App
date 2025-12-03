@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
+    "@microsoft/tsdoc": "^0.16.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-picker/picker": "2.11.1",
     "@tonejs/midi": "^2.0.28",
