@@ -28,6 +28,7 @@ import { useThemeAnimations } from "./src/utils/themeUtils";
 import LoginScreen from "./src/components/LoginScreen";
 import PerformanceStats from "./src/components/PerformanceStats";
 import { getCurrentUser, logoutUser } from "./src/utils/accountUtils";
+import PerformanceScreen from "./src/components/PerformanceScreen";
 
 // Define the main application component
 export default function App() {
@@ -266,7 +267,7 @@ export default function App() {
               />
 
               {/* Start button to play performance */}
-              <ScoreFollowerTest
+              <PerformanceScreen
                 score={state.score}
                 dispatch={dispatch}
                 bpm={state.tempo}

@@ -119,6 +119,8 @@ export default function ScoreDisplay({
   };
 
   const colorNotesInOSMD = (noteColors: NoteColor[]) => {
+    console.log("ApplyNoteColors", state.noteColors);
+
     // MOBILE branch
     if (Platform.OS !== "web") {
       webviewRef.current?.postMessage(JSON.stringify({
@@ -133,8 +135,8 @@ export default function ScoreDisplay({
     if (!osmd) return;
     
     if (!state.noteColors || state.noteColors.length === 0) {
-      // clear colors if want to reset: applyNoteColors(osmd, []);
-      return;
+      // clear colors 
+      applyNoteColors(osmd, []);
     }
 
     applyNoteColors(osmd, state.noteColors);
@@ -173,6 +175,7 @@ export default function ScoreDisplay({
 
   // Runtime refresh
   useEffect(() => {
+    console.log("colornote state change");
     colorNotesInOSMD(state.noteColors);
   }, [state.noteColors]);
 

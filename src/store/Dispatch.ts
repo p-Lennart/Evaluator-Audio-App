@@ -86,11 +86,12 @@ const reducer_function = (state: any, action: any) => {
         estimatedPitch: action.payload as number,
       };
 
-    case "SET_NOTE_COLORS": 
+    case "SET_NOTE_COLORS":
       console.log("[reducer] # of note colors:", action.payload.length);
       return {
         ...state,
-        noteColors: action.payload as NoteColor[],
+        // cloned payload to allow passing the same mutated array
+        noteColors: [...action.payload] as NoteColor[],
       };
 
     case "change_bottom_audio": // Keep the existing state and update the URI for playback audio (second instrument - only used in Companion Project) audio

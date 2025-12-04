@@ -10,6 +10,7 @@ import {
 
 import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
 import { NoteColor } from "../utils/musicXmlUtils";
+import { ScoreFollower } from "../audio/ScoreFollower";
 
 interface PerformanceScreenProps {
   score: string; // Selected score name
@@ -22,6 +23,34 @@ interface PerformanceScreenProps {
 const BUFFER_SIZE = 5;
 const ADVANCE_THRESHOLD = 1;
 
+class FrameBuffer {
+  buffer: number[];
+  capacity: number;
+  size: number;
+
+  constructor(capacity: number) {
+    this.buffer = [];
+    this.capacity = capacity;
+    this.size = 0;
+  }
+
+  insert(audioFrame: number[]) {
+    this.buffer = this.buffer.concat(audioFrame);
+    this.size += 1;
+  }
+
+  flush(): number[] {
+    const result = this.buffer;
+    this.buffer = [];
+    this.size = 0;
+    return result;
+  }
+ 
+  isFull() {
+    return this.size >= this.capacity;
+  }
+}
+
 export default function PerformanceScreen({
   score,
   dispatch,
@@ -30,9 +59,11 @@ export default function PerformanceScreen({
   state,
 }: PerformanceScreenProps) {
   const expNoteIdxRef = useRef<number>(0);
-  const frameBufferRef = useRef<number[]>([]);
+  const frameBufferRef = useRef<FrameBuffer | null>(null);
   const noteColorsRef = useRef<NoteColor[]>([]);
   const csvDataRef = useRef<CSVRow[]>([]); 
+  const scoreFollowerRef = useRef<ScoreFollower | null>(null);
+  
 
   const [testInput, setTestInput] = useState<number>(0);
 
@@ -43,7 +74,7 @@ export default function PerformanceScreen({
     if (!score) return;
 
     expNoteIdxRef.current = 0;
-    frameBufferRef.current = [];
+    frameBufferRef.current = new FrameBuffer(BUFFER_SIZE);
     noteColorsRef.current = [];
 
     const base = score.replace(/\.musicxml$/, "");
@@ -51,13 +82,23 @@ export default function PerformanceScreen({
     const noteTable = await loadCsvInfo(csvUri);
     csvDataRef.current = noteTable; 
 
-    // useMicStream({}, (frame) => processAudioFrameNBN(frame));
+    // useMicStream({}, (frame) => processAudioFrame(frame));
   };
 
   const processAudioFrameNBN = (audioFrame: number[]) => {
     if (!state.playing) {
       return;
     }      
+
+    frameBufferRef.current.insert(audioFrame);
+    // keep populating buffer if not full
+    console.log("Check if full", frameBufferRef.current.capacity, frameBufferRef.current.size);
+    if (!frameBufferRef.current.isFull()) return;
+
+    // flush buffer
+    const audioBufferContents = frameBufferRef.current.flush();
+    
+    // process buffer
 
     const expNoteIndex = expNoteIdxRef.current;
     const noteTable: CSVRow[] = csvDataRef.current;
@@ -68,20 +109,14 @@ export default function PerformanceScreen({
       return;
     };
 
-    frameBufferRef.current = frameBufferRef.current.concat(audioFrame);
-  
-    // keep populating buffer if not full
-    if (frameBufferRef.current.length < audioFrame.length * BUFFER_SIZE) return;
-
     const targetNote = csvDataRef.current[expNoteIndex];
-    const intonation = calcIntonation(frameBufferRef.current, targetNote);
-    // flush buffer
-    frameBufferRef.current = [];
-
+    const intonation = calcIntonation(audioBufferContents, targetNote);
+    
     // silence or no note
     if (Number.isNaN(intonation)) return;
-    
+
     // update note color of latest attempt
+    console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current, "state", state.noteColors);
     noteColorsRef.current[expNoteIndex] = intonationToNoteColor(intonation, expNoteIndex);
     dispatch({
         type: "SET_NOTE_COLORS",
@@ -90,19 +125,80 @@ export default function PerformanceScreen({
 
     // if attempt within range, advance note
     if (Math.abs(intonation) < ADVANCE_THRESHOLD) {
+      console.log("Abs of", intonation, "was within threshold", ADVANCE_THRESHOLD);
       expNoteIdxRef.current = expNoteIndex + 1;
 
       if (expNoteIdxRef.current < noteTable.length) {
-        const beat = noteTable[expNoteIdxRef.current].beat; 
-        dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
+        const beat = noteTable[expNoteIdxRef.current].beat;
+        // update beat to move cursor 
+        dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); 
       }
     } 
   }
 
+  const processAudioFrameDTW = (audioFrame: number[]) => {
+    let expNoteIndex = expNoteIdxRef.current;
+    const noteTable: CSVRow[] = csvDataRef.current;
+
+    // cap runaway index
+    if (expNoteIndex >= noteTable.length) {
+      expNoteIdxRef.current = noteTable.length;
+      return;
+    };
+
+    // advance to next unreached note
+    let targetTime = csvDataRef.current[expNoteIndex].refTime;
+    const estTime = scoreFollowerRef.current.step(audioFrame);
+
+    if (estTime < targetTime) {
+      frameBufferRef.current.insert(audioFrame);
+      return;
+    }
+
+    const prevNoteIndex = expNoteIndex;
+
+    while (estTime >= targetTime) {
+      expNoteIndex += 1;
+      expNoteIdxRef.current = expNoteIndex;
+      targetTime = csvDataRef.current[expNoteIndex].refTime;
+    }
+
+    const beat = csvDataRef.current[expNoteIdxRef.current].beat;
+    dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
+
+    const lastNoteBuffer = frameBufferRef.current.flush();
+    const targetNote = csvDataRef.current[prevNoteIndex];
+    
+    const intonation = calcIntonation(lastNoteBuffer, targetNote);
+    
+    // silence or no note
+    if (Number.isNaN(intonation)) return;
+
+    // update note color of latest attempt
+    console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current, "state", state.noteColors);
+    noteColorsRef.current[expNoteIndex] = intonationToNoteColor(intonation, expNoteIndex);
+    dispatch({
+        type: "SET_NOTE_COLORS",
+        payload: noteColorsRef.current,
+    });
+  }
+
   function calcIntonation(frameBuffer: number[], targetNote: CSVRow) {
+    console.log("buffer", frameBuffer);
     // temporary test function = mean
     if (frameBuffer.length === 0) return NaN; 
-    return frameBuffer.reduce((prev, current) => prev + current) / frameBuffer.length;
+    
+    let sum = 0;
+    let denom = 0;
+    for (let f of frameBuffer) {
+      if (Number.isNaN(f)) continue;
+      sum += f;
+      denom += 1;
+    }
+
+    if (denom <= frameBuffer.length * 0.75) return NaN;
+
+    return sum / denom;
   }
 
   const testNBN = () => {
@@ -143,13 +239,13 @@ export default function PerformanceScreen({
       <TouchableOpacity 
         style={[
           styles.button,
-          // (state.score === "" || state.playing) &&
-            // styles.disabledButton,
+          (state.score === "" || !state.playing) &&
+            styles.disabledButton,
         ]}
         onPress={testNBN}
-        // disabled={state.score === "" || state.playing} // Disabled when no score is selected or already playing performance
+        disabled={state.score === "" || !state.playing} // Disabled when no score is selected or not playing performance
       >
-      <Text>Feed Test Frame</Text>
+      <Text style={styles.buttonText}>Feed Test Frame</Text>
       </TouchableOpacity>
     </View>
   );
