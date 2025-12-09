@@ -40,7 +40,11 @@ def run_full_benchmark(test_suite_dir='data/test_suite', output_base_dir='result
     # 3. Add {'name': 'MyPDA', 'module': 'algorithms.my_pda'} to this list.
     algorithms_to_benchmark = [
         {'name': 'Aubio', 'module': 'algorithms.aubio'},
-        # Add other algorithms here
+        {'name': 'TarsosDSP_Yin', 'module': 'algorithms.tarsos_yin'},
+        {'name': 'TarsosDSP_FastYin', 'module': 'algorithms.tarsos_fast_yin'},
+        {'name': 'TarsosDSP_McLeod', 'module': 'algorithms.tarsos_mcleod'},
+        {'name': 'TarsosDSP_AMDF', 'module': 'algorithms.tarsos_amdf'},
+        {'name': 'TarsosDSP_DynamicWavelet', 'module': 'algorithms.tarsos_dynamic_wavelet'},
     ]
 
     for algo_info in algorithms_to_benchmark:
