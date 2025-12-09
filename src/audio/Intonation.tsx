@@ -90,7 +90,7 @@ async function calculateF0s(
           Array.from(window),
         );
 
-        f0s.push(detectedFrequency === -1 ? null : detectedFrequency);
+        f0s.push(detectedFrequency === -1 ? NaN : detectedFrequency);
       } catch (e) {
         console.error(
           "Android native pitch detection failed, falling back to JS library",
