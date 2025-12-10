@@ -10,7 +10,10 @@
     "format": "npx prettier --write .",
     "lint": "eslint . --fix && echo \"errors reported are the ones can't be fixed by eslint automatically\"",
     "test": "jest --watchAll",
-    "coverage": "jest --coverage"
+    "coverage": "jest --coverage",
+    "generate-assets": "node scripts/generate_assets.js",
+    "prebuild": "npm run generate-assets",
+    "postinstall": "npm run generate-assets"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -49,7 +52,8 @@
     "wav-decoder": "^1.3.0",
     "wav-decoder-ts": "^1.0.3",
     "wave-resampler": "^1.0.0",
-    "xmlbuilder2": "^3.1.1"
+    "xmlbuilder2": "^3.1.1",
+    "expo-sharing": "~14.0.7"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

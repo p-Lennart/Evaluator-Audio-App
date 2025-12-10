@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
 import { createAccount, loginUser, getAllUsers } from '../utils/accountUtils';
+import DataExtractionPanel from './DataExtraction';
 
 export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [username, setUsername] = useState('');
@@ -8,7 +9,8 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  
   const handleLogin = async () => {
     setErrorMessage('');
     setSuccessMessage('');
@@ -60,62 +62,75 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Evaluator Audio App</Text>
-      
-      <Text style={styles.subtitle}>
-        {isCreatingAccount ? 'Create New Account' : 'Login'}
-      </Text>
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={username}
-        onChangeText={setUsername}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-
-      {errorMessage ? (
-        <Text style={styles.errorText}>{errorMessage}</Text>
-      ) : null}
-
-      {successMessage ? (
-        <Text style={styles.successText}>{successMessage}</Text>
-      ) : null}
-      
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={isCreatingAccount ? handleCreateAccount : handleLogin}
-      >
-        <Text style={styles.buttonText}>
-          {isCreatingAccount ? 'Create Account' : 'Login'}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.toggleContainer}>
-        <Text style={styles.toggleText}>
-          {isCreatingAccount ? 'Already have an account? ' : "Don't have an account? "}
-        </Text>
-        <TouchableOpacity onPress={() => {
-          setIsCreatingAccount(!isCreatingAccount);
-          setErrorMessage('');
-          setSuccessMessage('');
-        }}>
-          <Text style={styles.toggleLink}>
-            {isCreatingAccount ? 'Login' : 'Sign up'}
+      {showAdminPanel ? (
+        <DataExtractionPanel onClose={() => setShowAdminPanel(false)} />
+      ) : (
+        <>
+          <TouchableOpacity 
+            style={styles.adminButton}
+            onPress={() => setShowAdminPanel(true)}
+          >
+            <Text style={styles.adminIcon}>Admin</Text>
+          </TouchableOpacity>
+            
+          <Text style={styles.title}>Evaluator Audio App</Text>
+        
+          <Text style={styles.subtitle}>
+            {isCreatingAccount ? 'Create New Account' : 'Login'}
           </Text>
-        </TouchableOpacity>
-      </View>
+        
+          <TextInput
+            style={styles.input}
+            placeholder="Username"
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          {errorMessage ? (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          ) : null}
+
+          {successMessage ? (
+            <Text style={styles.successText}>{successMessage}</Text>
+          ) : null}
+      
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={isCreatingAccount ? handleCreateAccount : handleLogin}
+          >
+            <Text style={styles.buttonText}>
+              {isCreatingAccount ? 'Create Account' : 'Login'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleText}>
+              {isCreatingAccount ? 'Already have an account? ' : "Don't have an account? "}
+            </Text>
+            <TouchableOpacity onPress={() => {
+              setIsCreatingAccount(!isCreatingAccount);
+              setErrorMessage('');
+              setSuccessMessage('');
+            }}>
+              <Text style={styles.toggleLink}>
+                {isCreatingAccount ? 'Login' : 'Sign up'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -195,6 +210,17 @@ const styles = StyleSheet.create({
     color: '#2C3E50', 
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  adminButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    padding: 10,
+    zIndex: 10,
+  },
+  adminIcon: {
+    fontSize: 24,
+    opacity: 0.3,
   },
   usersContainer: {
     marginTop: 30,

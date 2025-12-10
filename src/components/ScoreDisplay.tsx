@@ -9,6 +9,9 @@ import {
 } from "react-native";
 import React, { useRef, useEffect, useState } from "react";
 import { Cursor, OpenSheetMusicDisplay } from "opensheetmusicdisplay";
+
+// Debug flag for cursor lag analysis
+const DEBUG_CURSOR = true;
 import scoresData from "../score_name_to_data_map/scoreToMusicxmlMap"; // Local mapping of score filenames to XML content
 import { WebView } from "react-native-webview";
 import {
@@ -39,6 +42,15 @@ export default function ScoreDisplay({
   const animRef = useRef<number | null>(null); // ref to store current animation id
   const overshootBeats = useRef<number>(0); // How much beat value have we gone over by when going to next note and adding it's beat value (can ignore this - variable probably always 0 due to new implementation of movement logic)
   const renderSequenceRef = useRef<number>(0);
+  const isResetting = useRef<boolean>(false); // Flag to prevent cursor movement during reset
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const cursorMetrics = useRef({
+    totalMoves: 0,
+    totalTime: 0,
+    maxTime: 0,
+    avgTime: 0,
+  });
 
   // Determine if we need to update styles if screen is below a certain threshold
   const { width, height } = useWindowDimensions();
@@ -99,9 +111,10 @@ export default function ScoreDisplay({
         const leftover = moved - toMove;
         overshootBeats.current = leftover;
         movedBeats.current = toMove;
-        const renderSeq = renderSequenceRef.current++;
-        const renderTime = Date.now();
-        console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
+        if (DEBUG_CURSOR) {
+          const renderTime = Date.now();
+          console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
+        }
         osdRef.current!.render(); // Re-render the music sheet
         return;
       }
@@ -116,8 +129,10 @@ export default function ScoreDisplay({
       moved += delta; // Accumulate the moved beats
       movedBeats.current = moved; // Update reference
 
-      const renderTime = Date.now();
-      console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
+      if (DEBUG_CURSOR) {
+        const renderTime = Date.now();
+        console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
+      }
       osdRef.current!.render(); // Re-render to reflect the cursor's new position
       animRef.current = requestAnimationFrame(stepFn); // Schedule a new animation frame and store its ID (better alternative to setTimeout)
     };
@@ -176,8 +191,10 @@ export default function ScoreDisplay({
     movedBeats.current = moved;
     overshootBeats.current = moved - toMove;
     
-    const renderTime = Date.now();
-    console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
+    if (DEBUG_CURSOR) {
+      const renderTime = Date.now();
+      console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}`);
+    }
     osdRef.current!.render(); // Single render at end
   };
 
@@ -201,9 +218,124 @@ export default function ScoreDisplay({
     }
 
     applyNoteColors(osmd, state.noteColors);
-}
+  }
+
+  const resetCursor = () => {
+    console.group('[Cursor Reset]');
+    console.log('State:', {
+      movedBeats: movedBeats.current,
+      overshootBeats: overshootBeats.current,
+      hasAnimation: animRef.current !== null
+    });
+
+    // Cancel any ongoing animations
+    if (animRef.current !== null) {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+      console.log('Cancelled ongoing animation');
+    }
+
+    // Reset state refs
+    movedBeats.current = 0;
+    overshootBeats.current = 0;
+    renderSequenceRef.current = 0;
+
+    // Mobile - send reset message to WebView
+    if (Platform.OS !== "web") {
+      console.log('Platform: Mobile - sending reset message to WebView');
+      webviewRef.current?.postMessage(JSON.stringify({
+        type: "resetCursor",
+      }));
+      console.groupEnd();
+      return;
+    }
+
+    // Web branch - reset cursor to beginning with error handling
+    console.log('Platform: Web');
+    console.log('OSMD ready:', !!osdRef.current?.IsReadyToRender());
+    console.log('Cursor ref:', !!cursorRef.current);
+
+    if (!osdRef.current) {
+      console.error('OSMD ref not available');
+      console.groupEnd();
+      return;
+    }
+
+    if (!osdRef.current.IsReadyToRender()) {
+      console.error('OSMD not ready to render, retrying in 100ms');
+      // Try again after a short delay
+      setTimeout(() => {
+        console.log('Retrying reset after delay');
+        resetCursor();
+      }, 100);
+      console.groupEnd();
+      return;
+    }
+
+    try {
+      // Reset cursor position
+      if (!cursorRef.current) {
+        console.error('Cursor ref not available');
+        console.groupEnd();
+        return;
+      }
+
+      // Get time signature for verification
+      const measures = osdRef.current.GraphicSheet.MeasureList;
+      const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature!.Denominator;
+
+      // Hide cursor before reset
+      cursorRef.current.hide();
+
+      // Reset cursor iterator
+      cursorRef.current.reset();
+
+      // Verify cursor is actually at the beginning
+      const actualPosition = peekAtCurrentBeat(
+        cursorRef.current,
+        osdRef.current.Sheet.Instruments,
+        denom,
+      );
+      console.log('Cursor position after reset:', actualPosition);
+
+      // Show cursor at the first position
+      cursorRef.current.show();
+
+      // Force a render to update the display
+      osdRef.current.render();
+
+      // Additional render after a brief delay to ensure visual update
+      setTimeout(() => {
+        if (osdRef.current && cursorRef.current) {
+          osdRef.current.render();
+          console.log('Additional render completed');
+        }
+      }, 50);
+
+      console.log('Cursor successfully reset to beginning');
+    } catch (error) {
+      console.error('Failed to reset cursor:', error);
+    }
+
+    console.groupEnd();
+  };
 
 
+  // Expose resetCursor function globally for web
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      (window as any).resetCursor = resetCursor;
+    }
+
+    return () => {
+      // Cleanup on unmount
+      if (Platform.OS === "web") {
+        delete (window as any).resetCursor;
+      }
+    };
+  }, []);
+
+/*
   // Cursor movement effect
   useEffect(() => {
     const beat = state.estimatedBeat; // Get beat from global state
@@ -217,7 +349,6 @@ export default function ScoreDisplay({
     moveCursorByBeatsDirectJump(); // Cursor movement using the latest step
   }, [steps, speed]); // Queue when step or speed state (speed var only applicable on testing input) changes
 
-/*
   useEffect(() => {
     const beat = state.estimatedBeat;
     if (typeof beat !== "number") return;
@@ -297,40 +428,154 @@ export default function ScoreDisplay({
     if (typeof beat !== "number") return;
     
     const targetBeats = beat;
-    console.log(`Target beat requested: ${targetBeats}`);
+
+    if (isResetting.current && targetBeats > 0) {
+      if (DEBUG_CURSOR) console.log("Clearing stuck reset flag for beat", targetBeats);
+      isResetting.current = false;
+    }
+
+    // Skip cursor movement if we're in the middle of a reset
+    if (isResetting.current) {
+      if (DEBUG_CURSOR) console.log("Skipping cursor movement - reset in progress");
+      return;
+    }
+    
+    if (DEBUG_CURSOR) {
+      console.group(`[Cursor Move] → ${targetBeats}`);
+      console.log('Current position:', movedBeats.current);
+      console.log('Overshoot:', overshootBeats.current);
+      console.log('Platform:', Platform.OS);
+    }
 
     // Cancel any previous animation
     if (animRef.current !== null) {
       cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+      if (DEBUG_CURSOR) console.log('Cancelled previous animation');
+    }
+
+    if (targetBeats === 0) {
+      if (DEBUG_CURSOR) console.log("Beat 0 detected - Enforcing hard reset by reloading score");
+      
+      // Set reset flag to prevent any other cursor operations
+      isResetting.current = true;
+      
+      movedBeats.current = 0;
+      overshootBeats.current = 0;
+      renderSequenceRef.current = 0;
+
+      if (Platform.OS !== "web") {
+        webviewRef.current?.postMessage(JSON.stringify({
+          type: "resetCursor",
+        }));
+        // Delay clearing the reset flag to allow the WebView to process the message
+        setTimeout(() => {
+          isResetting.current = false;
+        }, 200);
+      } else if (osdRef.current && cursorRef.current) {
+        try {
+          const xmlContent = (state.scoreContents && state.scoreContents[state.score]) || scoresData[state.score];
+          
+          if (!xmlContent) {
+            console.error("Score content not found for reset");
+            isResetting.current = false;
+            if (DEBUG_CURSOR) console.groupEnd();
+            return;
+          }
+
+          if (DEBUG_CURSOR) console.log("Reloading score to reset cursor...");
+          
+          // Store current zoom level before reloading
+          const currentZoom = osdRef.current.zoom;
+          
+          // Reload the score which will recreate the cursor at the beginning
+          osdRef.current.load(xmlContent).then(() => {
+            if (!osdRef.current) {
+              isResetting.current = false;
+              return;
+            }
+            
+            // Restore zoom level
+            osdRef.current.zoom = currentZoom;
+            
+            // Render the score
+            osdRef.current.render();
+            
+            // Update cursor ref and show it
+            cursorRef.current = osdRef.current.cursor;
+            if (cursorRef.current) {
+              cursorRef.current.show();
+              cursorRef.current.CursorOptions = {
+                ...cursorRef.current.CursorOptions,
+                follow: true,
+              };
+            }
+            
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+            
+            if (DEBUG_CURSOR) console.log("Score reloaded - cursor reset to beginning");
+            
+            // Clear reset flag after a delay to ensure render completes
+            setTimeout(() => {
+              isResetting.current = false;
+              if (DEBUG_CURSOR) console.log("Reset flag cleared");
+            }, 100);
+          }).catch((error) => {
+            console.error("Error reloading score for reset:", error);
+            isResetting.current = false;
+          });
+        } catch (error) {
+          console.error("Error during hard reset:", error);
+          isResetting.current = false;
+        }
+      } else {
+        // If OSMD is not ready, clear the flag immediately
+        isResetting.current = false;
+      }
+      if (DEBUG_CURSOR) console.groupEnd();
+      return;
     }
 
     // MOBILE branch
     if (Platform.OS !== "web") {
+      if (DEBUG_CURSOR) console.log('Sending moveCursor message to WebView');
       webviewRef.current?.postMessage(JSON.stringify({
         type: "moveCursor",
         targetBeats: targetBeats,
       }));
+      if (DEBUG_CURSOR) console.groupEnd();
       return;
     }
 
-    // --- WEB branch ---
+    // WEB branch
     if (!osdRef.current?.IsReadyToRender()) {
-      console.warn("Please call load() and render() before stepping cursor.");
+      if (DEBUG_CURSOR) {
+        console.warn("OSMD not ready to render");
+        console.groupEnd();
+      }
       return;
     }
 
     const measures = osdRef.current.GraphicSheet.MeasureList;
-    if (!measures.length || !measures[0].length) return;
+    if (!measures.length || !measures[0].length) {
+      if (DEBUG_CURSOR) {
+        console.warn("No measures available");
+        console.groupEnd();
+      }
+      return;
+    }
 
     const denom = measures[0][0].parentSourceMeasure.ActiveTimeSignature!.Denominator;
 
     let initialBeats = movedBeats.current;
-    if (movedBeats.current === 0) {
+    // Only peek at cursor position if we haven't explicitly set it (and we're not just coming from a reset)
+    if (movedBeats.current === 0 && targetBeats !== 0) {
       initialBeats = peekAtCurrentBeat(
         cursorRef.current!,
         osdRef.current.Sheet.Instruments,
         denom,
       );
+      if (DEBUG_CURSOR) console.log('Initializing from cursor position:', initialBeats);
     }
     movedBeats.current = initialBeats;
 
@@ -338,26 +583,73 @@ export default function ScoreDisplay({
     let moved = movedBeats.current + overshootBeats.current;
     overshootBeats.current = 0;
 
-    console.log(`Moving cursor: from ${movedBeats.current} to ${targetBeats}`);
+    if (DEBUG_CURSOR) console.log('Movement plan: from', moved, 'to', toMove);
 
-    // Direct jump without intermediate renders
-    while (moved < toMove) {
-      let delta = advanceToNextBeat(
-        cursorRef.current!,
-        osdRef.current.Sheet.Instruments,
-        denom,
-      );
-      moved += delta;
+    const startTime = performance.now();
+    if (DEBUG_CURSOR) console.time('cursor-movement');
+
+    // Async stepping function using requestAnimationFrame
+    function stepAsync() {
+      if (moved >= toMove) {
+        const leftover = moved - toMove;
+        overshootBeats.current = leftover;
+        movedBeats.current = toMove;
+
+        const duration = performance.now() - startTime;
+        if (DEBUG_CURSOR) {
+          console.timeEnd('cursor-movement');
+
+          // Update performance metrics
+          cursorMetrics.current.totalMoves++;
+          cursorMetrics.current.totalTime += duration;
+          cursorMetrics.current.maxTime = Math.max(cursorMetrics.current.maxTime, duration);
+          cursorMetrics.current.avgTime = cursorMetrics.current.totalTime / cursorMetrics.current.totalMoves;
+
+          console.log('Performance:', {
+            duration: `${duration.toFixed(2)}ms`,
+            avg: `${cursorMetrics.current.avgTime.toFixed(2)}ms`,
+            max: `${cursorMetrics.current.maxTime.toFixed(2)}ms`,
+            totalMoves: cursorMetrics.current.totalMoves
+          });
+          console.log(`Reached beat ${toMove}`);
+        }
+
+        if (DEBUG_CURSOR) {
+          const renderTime = Date.now();
+          console.log(`[Cursor Render] Beat=${toMove}, RenderTime=${renderTime}`);
+        }
+        
+        osdRef.current!.render();
+        animRef.current = null;
+        if (DEBUG_CURSOR) console.groupEnd();
+        return;
+      }
+
+      try {
+        let delta = advanceToNextBeat(
+          cursorRef.current!,
+          osdRef.current!.Sheet.Instruments,
+          denom,
+        );
+        moved += delta;
+        movedBeats.current = moved;
+
+        // Render intermediate step for smoother animation
+        osdRef.current!.render();
+
+        // Schedule next step
+        animRef.current = requestAnimationFrame(stepAsync);
+      } catch (error) {
+        if (DEBUG_CURSOR) {
+          console.error('Error during stepping:', error);
+          console.groupEnd();
+        }
+        animRef.current = null;
+      }
     }
 
-    movedBeats.current = moved;
-    overshootBeats.current = moved - toMove;
-    
-    const renderSeq = renderSequenceRef.current++;
-    const renderTime = Date.now();
-    
-    console.log(`[Cursor Render] Beat=${targetBeats}, RenderTime=${renderTime}, Seq=${renderSeq}`);
-    osdRef.current.render();
+    // Start animation
+    stepAsync();
   }, [state.estimatedBeat]);
 
   // Web-only initialization

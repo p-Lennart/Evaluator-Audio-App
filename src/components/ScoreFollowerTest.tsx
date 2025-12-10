@@ -49,6 +49,7 @@ export default function ScoreFollowerTest({
   const nextIndexRef = useRef<number>(0); // Track next CSV index to dispatch
   const soundRef = useRef<Audio.Sound | null>(null); // Reference to Audio Component
   const followerRef = useRef<ScoreFollower | null>(null); // Reference to score follower instance
+  const webViewRef = useRef<any>(null);
   const audioDataRef = useRef<Float32Array>(new Float32Array()); // Reference to decoded audio sample data
   const pathRef = useRef<[number, number][]>([]); // Reference to alignment path
   const inputRef = useRef<HTMLInputElement>(null); // Reference to the file select HTML element
@@ -70,6 +71,26 @@ export default function ScoreFollowerTest({
       }
     };
   }, []);
+
+  useEffect(() => {
+    console.log('[ScoreFollowerTest] Score changed to:', score);
+    
+    if (soundRef.current) {
+      soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    }
+    
+    setLiveFile(null);
+    
+    setPerformanceComplete(false);
+    setPerformanceSaved(false);
+    
+    nextIndexRef.current = 0;
+    followerRef.current = null;
+    audioDataRef.current = new Float32Array();
+    pathRef.current = [];
+    csvDataRef.current = [];
+  }, [score]);
 
   // Web versin of wav file upload
   function onWebChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -188,7 +209,6 @@ export default function ScoreFollowerTest({
           false
         );
 
-        console.log("=== PETER'S DEBUG TEST ACTIVE ===");
         console.log("Perfect timestamps mode enabled - using refTimes directly");
         console.log("Expected result: cursor should move in perfect sync with audio");
         console.log("Sample refTimes:", refTimes.slice(0, 5));
@@ -229,7 +249,6 @@ export default function ScoreFollowerTest({
         console.log("Timing differences (predicted - reference):", timingDiffs1.slice(0, 10));
 
 
-        console.log("🔬 PETER'S DEBUG TEST RESULTS:");
         console.log("Using perfect timestamps (refTimes directly)");
         const timingComparison2 = csvDataRef.current.slice(0, 10).map(row => ({
           beat: row.beat,
@@ -296,124 +315,34 @@ export default function ScoreFollowerTest({
       setWarpingPath(pathRef.current); // Save warping path in local "warpingPath" state
 
       const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-        // Callback to handle audio playback status updates
-        if (!status.isLoaded) return; // Exit early if sound isn't loaded
-        const currentTimeSec = status.positionMillis / 1000; // Convert current playback time from milliseconds to seconds
+        if (!status.isLoaded) return;
+        const currentTimeSec = status.positionMillis / 1000;
+      while (
+        nextIndexRef.current < csvDataRef.current.length &&
+        currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
+      ) {
+        const beat = csvDataRef.current[nextIndexRef.current].beat;
+        const predictedTime = csvDataRef.current[nextIndexRef.current].predictedTime;
+        console.log(`Audio time: ${currentTimeSec.toFixed(3)}s, Note time: ${predictedTime.toFixed(3)}s, Beat: ${beat}`);
+        nextIndexRef.current++;
 
-        let iterations = 0;
-        /*
-        console.log("Tick", currentTimeSec, nextIndexRef.current < csvDataRef.current.length, currentTimeSec >=
-            csvDataRef.current[nextIndexRef.current].predictedTime);
-
-        while (
-          // Process only if the frame is within bounds and we have passed a predicted time of current csv row
-          nextIndexRef.current < csvDataRef.current.length &&
-          currentTimeSec >=
-            csvDataRef.current[nextIndexRef.current].predictedTime
-        ) {
-          const beat = csvDataRef.current[nextIndexRef.current].beat; // Get beat of that note
-          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); // Update beat to move cursor
-          
-          if (iterations % 10 == 0) {
-            const intonationChunk = csvDataRef.current.slice(0, nextIndexRef.current);
-            
-            const noteColors: NoteColor[] = intonationChunk.map((row, idx) => {
-              return intonationToNoteColor(row.intonation, 0 + idx);
-            });
-
-            dispatch({
-                type: "SET_NOTE_COLORS",
-                payload: noteColors,
-            });
-          } 
-
-          nextIndexRef.current++; // Go to next row of csv
-        }
-        */
-        // Enhanced logging for debugging cursor lag
-        const nextIndex = nextIndexRef.current;
-        const hasMoreNotes = nextIndex < csvDataRef.current.length;
-        const nextNote = hasMoreNotes ? csvDataRef.current[nextIndex] : null;
-        const nextPredictedTime = nextNote?.predictedTime;
-        const timeCondition = hasMoreNotes && currentTimeSec >= nextPredictedTime;
-        
-        // Detailed logging every tick
-        console.log(`=== PLAYBACK TICK ===`);
-        console.log(`Current time: ${currentTimeSec.toFixed(3)}s`);
-        console.log(`Next note index: ${nextIndex}/${csvDataRef.current.length}`);
-        if (nextNote) {
-          console.log(`Next note beat: ${nextNote.beat}, predicted time: ${nextPredictedTime?.toFixed(3)}s`);
-          console.log(`Time difference: ${(currentTimeSec - nextPredictedTime).toFixed(3)}s`);
-          console.log(`Should dispatch: ${timeCondition}`);
-        }
-
-/*
-        while (
-          nextIndexRef.current < csvDataRef.current.length &&
-          currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
-        ) {
-          const currentNote = csvDataRef.current[nextIndexRef.current];
-          const beat = currentNote.beat;
-          const pitch = currentNote.intonation;
-          const dispatchTime = Date.now();
-          const audioTime = currentTimeSec;
-          const predictedTime = currentNote.predictedTime;
-          const diff = audioTime - predictedTime;
-          const dispatchSeq = dispatchSequenceRef.current++;
-          console.log(`Dispatch Timing: Audio=${audioTime.toFixed(3)}s, Predicted=${predictedTime.toFixed(3)}s, Diff=${(diff*1000).toFixed(1)}ms, Beat=${beat}`);
-          console.log(`🎵 DISPATCHING BEAT UPDATE: ${beat} at time ${currentTimeSec.toFixed(3)}s (predicted: ${currentNote.predictedTime.toFixed(3)}s), DispatchTime=${dispatchTime}`);
-          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
-          const dispatchDelay = Date.now() - dispatchTime;
-          console.log(`Cursor Dispatch: Beat ${beat} dispatched with ${dispatchDelay}ms delay`);
-          nextIndexRef.current++;
-        }
-*/
-
-        // Collect all beats that should trigger in this tick
-        const beatsToProcess: number[] = [];
-        let lastNote = null;
-
-        while (
-          nextIndexRef.current < csvDataRef.current.length &&
-          currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
-        ) {
-          const currentNote = csvDataRef.current[nextIndexRef.current];
-          const beat = currentNote.beat;
-          const dispatchTime = Date.now();
-          const dispatchSeq = dispatchSequenceRef.current++;
-          
-          console.log(`🎵 DISPATCHING BEAT UPDATE: ${beat} at time ${currentTimeSec.toFixed(3)}s, DispatchTime=${dispatchTime}, Seq=${dispatchSeq}`);
-          
-          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
-          
-          nextIndexRef.current++;
-        }
-/*
-        // Only dispatch once with the LAST beat
-        if (beatsToProcess.length > 0 && lastNote) {
-          const beat = lastNote.beat;
-          const dispatchTime = Date.now();
-          const audioTime = currentTimeSec;
-          const predictedTime = lastNote.predictedTime;
-          const diff = audioTime - predictedTime;
-          
-          console.log(`Batched ${beatsToProcess.length} beats: [${beatsToProcess.join(', ')}] → dispatching final beat: ${beat}`);
-          console.log(`Dispatch Timing: Audio=${audioTime.toFixed(3)}s, Predicted=${predictedTime.toFixed(3)}s, Diff=${(diff*1000).toFixed(1)}ms, Beat=${beat}`);
-          console.log(`🎵 DISPATCHING BEAT UPDATE: ${beat} at time ${currentTimeSec.toFixed(3)}s (predicted: ${predictedTime.toFixed(3)}s), DispatchTime=${dispatchTime}`);
-          
-          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
-          
-          const dispatchDelay = Date.now() - dispatchTime;
-          console.log(`Cursor Dispatch: Beat ${beat} dispatched with ${dispatchDelay}ms delay`);
-        }
-*/
-        // Handle end of playback
+        // Unified cursor control via state dispatch
+        // Pass audioTime for lag analysis logging
+        dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat, audioTime: currentTimeSec } as any);  
+      }
         if (status.didJustFinish) {
           dispatch({ type: "start/stop" }); // Toggle "playing" boolean (to false in this case)
+          dispatch({ type: "SET_NOTE_COLORS", payload: [] }); 
           setPerformanceComplete(true); // Toggle performanceComplete booelan to true
-          dispatch({ type: "SET_ESTIMATED_BEAT", payload: 0 }); // Reset beat value to 0 since performance is done (cursor is visually at end still, need to select another score to re-render the sheet)
           nextIndexRef.current = 0; // Reset index ref so we can play again and update estimated beat properly in the while loop above
           soundRef.current?.setOnPlaybackStatusUpdate(null); // Stop listening for playback updates
+
+          console.log('[Performance End] Cursor reset triggered');
+          
+          // Reset cursor by setting beat to 0 after a short delay to ensure all other state updates complete
+          setTimeout(() => {
+            dispatch({ type: "SET_ESTIMATED_BEAT", payload: 0 });
+          }, 100);
         }
       };
 

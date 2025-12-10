@@ -310,6 +310,7 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
         window.__movedBeats = 0;
         window.__overshootBeats = 0;
         window.__stepLoopId = null;
+        window.__originalXml = \`${escapedXml}\`; // Store original XML for reloading
 
         (async () => {
           // ===== Initialize and load OSMD =====
@@ -543,6 +544,63 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
               }));
             }
 
+            // Handle cursor reset
+            else if (msg.type === "resetCursor") {
+              console.log("[WebView] Resetting cursor by reloading score");
+
+              // Cancel any ongoing animation
+              if (window.__stepLoopId !== null) {
+                cancelAnimationFrame(window.__stepLoopId);
+                window.__stepLoopId = null;
+              }
+
+              // Reset state variables
+              window.__movedBeats = 0;
+              window.__overshootBeats = 0;
+
+              if (window.osm && window.__originalXml) {
+                const currentZoom = window.osm.zoom;
+                
+                // Reload using the original XML that was passed when WebView was created
+                window.osm.load(window.__originalXml).then(() => {
+                  if (window.osm) {
+                    // Restore zoom
+                    window.osm.zoom = currentZoom;
+                    
+                    window.osm.render();
+                    
+                    if (window.osm.cursor) {
+                      window.osm.cursor.show();
+                      window.osm.cursor.CursorOptions = {
+                        ...window.osm.cursor.CursorOptions,
+                        follow: true,
+                      };
+                    }
+                    console.log("[WebView] Score reloaded, cursor reset to beginning");
+                  }
+                  
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: "cursorResetAck",
+                  }));
+                }).catch((err) => {
+                  console.error("[WebView] Error reloading score:", err);
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: "cursorResetAck",
+                  }));
+                });
+              } else {
+                // Fallback if XML not available
+                console.warn("[WebView] Original XML not found, using fallback reset");
+                if (window.osm && window.osm.cursor) {
+                  window.osm.cursor.reset();
+                  window.osm.render();
+                }
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: "cursorResetAck",
+                }));
+              }
+            }
+
           } catch (err) {
             console.error("[WebView] Bad RN->WebView message", err);
             window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -607,6 +665,11 @@ export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
       // ---- Cursor movement confirmation ----
       case "cursorMovedAck":
         console.log(`[WebView] Cursor moved to beat ${data.targetBeats}`);
+        break;
+
+      // ---- Cursor reset confirmation ----
+      case "cursorResetAck":
+        console.log(`[WebView] Cursor reset confirmed`);
         break;
 
       // ---- Unknown message type ----

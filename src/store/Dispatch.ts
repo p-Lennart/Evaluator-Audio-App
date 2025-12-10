@@ -1,7 +1,11 @@
 import { NoteColor } from "../utils/musicXmlUtils";
+import { Platform } from "react-native";
+
+// Debug flag for cursor lag analysis
+const DEBUG_CURSOR = true;
 
 const reducer_function = (state: any, action: any) => {
-  console.log("Dispatch received.");
+  if (DEBUG_CURSOR) console.log("Dispatch received.");
   // Conventions vary, but this one is rather common - the action argument
   // should be an object with the type property; this determines what type
   // of action to carry out on the state.  The action can have other properties;
@@ -29,12 +33,18 @@ const reducer_function = (state: any, action: any) => {
       };
 
     case "change_score": // Keep current global state values, but update score name, accompanimentSound (not applicable in Evaluator project), and set playing to false
+      // Reset cursor when changing scores (Web only, Mobile handled on WebView load)
+      if (Platform.OS === "web" && typeof window !== 'undefined' && (window as any).resetCursor) {
+        (window as any).resetCursor();
+      }
+
       return {
         ...state,
         ...{
           score: action.score,
           accompanimentSound: action.accompanimentSound,
           playing: false,
+          estimatedBeat: 0, 
         },
       };
 
@@ -43,7 +53,7 @@ const reducer_function = (state: any, action: any) => {
       var new_files = action.scores.filter(
         (filename: string) => !known_files.includes(filename),
       );
-      console.log("New files are: ", new_files);
+      if (DEBUG_CURSOR) console.log("New files are: ", new_files);
       return {
         ...state,
         ...{
@@ -63,31 +73,37 @@ const reducer_function = (state: any, action: any) => {
       };
 
     case "change_reference_audio": // Keep the existing state and update the URI for reference audio
-      console.log(
-        "[reducer] referenceAudioUri stored in state:",
-        action.referenceAudioUri,
-      );
+      if (DEBUG_CURSOR) {
+        console.log(
+          "[reducer] referenceAudioUri stored in state:",
+          action.referenceAudioUri,
+        );
+      }
       return {
         ...state,
         referenceAudioUri: action.referenceAudioUri as string,
       };
 
     case "SET_ESTIMATED_BEAT": // Keep the existing state and update estimatedBeat variable
-      console.log("[reducer] Estimated beat:", action.payload);
+      if (DEBUG_CURSOR) {
+        const dispatchTime = Date.now();
+        console.log(`DISPATCHING BEAT UPDATE: ${action.payload} at time ${(action.audioTime || 0).toFixed(3)}s, DispatchTime=${dispatchTime}`);
+        console.log("[reducer] Estimated beat:", action.payload);
+      }
       return {
         ...state,
         estimatedBeat: action.payload as number,
       };
 
     case "SET_ESTIMATED_PITCH": // Keep the existing state and  update estimatedBeat variable
-      console.log("[reducer] Estimated pitch:", action.payload);
+      if (DEBUG_CURSOR) console.log("[reducer] Estimated pitch:", action.payload);
       return {
         ...state,
         estimatedPitch: action.payload as number,
       };
 
     case "SET_NOTE_COLORS": 
-      console.log("[reducer] # of note colors:", action.payload.length);
+      if (DEBUG_CURSOR) console.log("[reducer] # of note colors:", action.payload.length);
       return {
         ...state,
         noteColors: action.payload as NoteColor[],

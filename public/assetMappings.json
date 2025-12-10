@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2025-12-10T08:25:09.470Z",
+  "scoreCount": 2,
+  "errors": [
+    {
+      "score": "green_sleeves/200bpm",
+      "missing": [
+        "notes.midi",
+        "ref_notes.csv"
+      ]
+    },
+    {
+      "score": "green_sleeves/220bpm",
+      "missing": [
+        "notes.midi",
+        "ref_notes.csv"
+      ]
+    },
+    {
+      "score": "hark/100bpm",
+      "missing": [
+        "ref_notes.csv"
+      ]
+    },
+    {
+      "score": "hark/110bpm",
+      "missing": [
+        "ref_notes.csv"
+      ]
+    },
+    {
+      "score": "ode_to_joy/100bpm",
+      "missing": [
+        "notes.midi"
+      ]
+    },
+    {
+      "score": "ode_to_joy/110bpm",
+      "missing": [
+        "notes.midi"
+      ]
+    }
+  ],
+  "scores": {
+    "air_on_the_g_string/100bpm": {
+      "pieceName": "air_on_the_g_string",
+      "bpm": 100,
+      "musicxml": "/air_on_the_g_string/100bpm/score.musicxml",
+      "midi": "/air_on_the_g_string/100bpm/notes.midi",
+      "csv": "/air_on_the_g_string/100bpm/ref_notes.csv",
+      "audio": "/air_on_the_g_string/100bpm/ref_audio.wav"
+    },
+    "schumann_melodyVLCduet/100bpm": {
+      "pieceName": "schumann_melodyVLCduet",
+      "bpm": 100,
+      "musicxml": "/schumann_melodyVLCduet/100bpm/score.musicxml",
+      "midi": "/schumann_melodyVLCduet/100bpm/notes.midi",
+      "csv": "/schumann_melodyVLCduet/100bpm/ref_notes.csv",
+      "audio": "/schumann_melodyVLCduet/100bpm/ref_audio.wav"
+    }
+  }
+}
