@@ -1,8 +1,10 @@
+from pathlib import Path
 import mir_eval
 import numpy as np
 import os
 import glob
 import importlib
+import pandas as pd
 
 # --- Evaluation Function ---
 def evaluate_pitch_detection(ground_truth_path, estimated_path):
@@ -59,6 +61,7 @@ def run_full_benchmark(test_suite_dir='data/test_suite', output_base_dir='result
             print(f"Error loading algorithm '{algo_name}' from '{algo_module_name}': {e}")
             continue
 
+        all_scores = {}
         for audio_path in audio_files:
             filename_base = os.path.splitext(os.path.basename(audio_path))[0]
             print(f"\n--- Test Case: {filename_base} ---")
@@ -80,13 +83,21 @@ def run_full_benchmark(test_suite_dir='data/test_suite', output_base_dir='result
             print("Evaluating results...")
             try:
                 scores = evaluate_pitch_detection(ground_truth_path, estimated_path)
+
+                all_scores[Path(audio_path).name] = scores
+
                 for key, value in scores.items():
                     print(f"{key}: {value:.3f}")
             except Exception as e:
                 print(f"Error evaluating {filename_base}: {e}")
                 
             print("-" * (len(filename_base) + 14))
+
+            df = pd.DataFrame.from_dict(all_scores, orient="index")
+            df.to_csv(os.path.join(algo_output_dir, 'scores.csv'), index=False)
+
         print(f"======== {algo_name} Benchmark Complete ========\n")
+
 
 if __name__ == '__main__':
     # Ensure the results directory exists

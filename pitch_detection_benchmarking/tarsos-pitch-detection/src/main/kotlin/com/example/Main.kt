@@ -1,5 +1,6 @@
 package com.example
 
+import be.tarsos.dsp.AudioDispatcher
 import be.tarsos.dsp.AudioEvent
 import be.tarsos.dsp.AudioProcessor
 import be.tarsos.dsp.io.jvm.AudioDispatcherFactory
@@ -25,17 +26,6 @@ fun getPitchDetectionAlgorithm(
     }
 }
 
-/** Apply an in-place Hann window to the buffer */
-fun applyHannWindow(buffer: FloatArray) {
-    val n = buffer.size
-    if (n <= 1) return
-    // Hann: w[n] = 0.5 * (1 - cos(2π n / (N - 1)))
-    for (i in 0 until n) {
-        val w = 0.5f * (1.0f - cos(2.0 * PI * i / (n - 1)).toFloat())
-        buffer[i] = buffer[i] * w
-    }
-}
-
 fun main(args: Array<String>) {
     if (args.size < 2) {
         println("Usage: <algorithm> <path-to-audio> [bufferSize] [overlap]")
@@ -55,12 +45,18 @@ fun main(args: Array<String>) {
         return
     }
 
-    val dispatcher = AudioDispatcherFactory.fromFile(file, bufferSize, overlap)
-    val srcRate = dispatcher.format.sampleRate.toFloat()
+    // Create dispatcher from pipe. This will spawn ffmpeg and read raw PCM.
+    // Note: on Android use the Android AudioDispatcherFactory variant.
+    val dispatcher = AudioDispatcherFactory.fromPipe(
+        path,
+        DEFAULT_SAMPLE_RATE.toInt(),
+        bufferSize,
+        overlap,
+    )
 
     // Construct a pitch detector configured with the *source* sample rate and bufferSize.
     // It's important the detector's expected frame size matches the frames we pass in.
-    val pitchDetector: PitchDetector = getPitchDetectionAlgorithm(algorithmName, srcRate, bufferSize)
+    val pitchDetector: PitchDetector = getPitchDetectionAlgorithm(algorithmName, DEFAULT_SAMPLE_RATE, bufferSize)
 
     // Running sample counter (in samples of the source rate)
     var samplesSeen: Long = 0L
@@ -68,7 +64,6 @@ fun main(args: Array<String>) {
 
     dispatcher.addAudioProcessor(object : AudioProcessor {
         override fun process(audioEvent: AudioEvent): Boolean {
-            // audioEvent.floatBuffer length should equal bufferSize
             val frame = audioEvent.floatBuffer
             if (frame.size != bufferSize) {
                 // This shouldn't happen with fromFile(..., bufferSize, overlap),
@@ -82,7 +77,6 @@ fun main(args: Array<String>) {
             // Make a copy if you want to keep original buffer intact elsewhere.
             // But modifying in-place is fine if no other processor relies on untouched data.
             val windowed = frame.copyOf()
-            applyHannWindow(windowed)
 
             // Ask the pitch detector for a pitch
             val detection = pitchDetector.getPitch(windowed)
