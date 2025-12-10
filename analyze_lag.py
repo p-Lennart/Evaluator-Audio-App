@@ -10,13 +10,13 @@ def parse_cursor_logs(file_path):
         print(f"File not found: {file_path}")
         return
     
-    # Patterns with optional sequence numbers
-    dispatch_pattern = r'🎵 DISPATCHING BEAT UPDATE: ([\d.]+) at time ([\d.]+)s.*DispatchTime=(\d+)(?:, Seq=(\d+))?'
+    # Patterns with optional sequence numbers and ISO timestamp prefix
+    dispatch_pattern = r'DISPATCHING BEAT UPDATE: ([\d.]+) at time ([\d.]+)s.*?DispatchTime=(\d+)(?:, Seq=(\d+))?'
     render_pattern = r'\[Cursor Render\] Beat=([\d.]+), RenderTime=(\d+)(?:, Seq=(\d+))?'
     
     print(f"Searching for patterns in log file...")
-    print(f"Sample dispatch pattern: 🎵 DISPATCHING BEAT UPDATE: 1.0 at time 0.500s (predicted: 0.500s), DispatchTime=1234567890, Seq=0")
-    print(f"Sample render pattern: [Cursor Render] Beat=1.0, RenderTime=1234567890, Seq=0")
+    print(f"Sample dispatch pattern: DISPATCHING BEAT UPDATE: 1.0 at time 0.500s, DispatchTime=1234567890")
+    print(f"Sample render pattern: [Cursor Render] Beat=1.0, RenderTime=1234567890")
     
     dispatches = re.findall(dispatch_pattern, content)
     renders = re.findall(render_pattern, content)
