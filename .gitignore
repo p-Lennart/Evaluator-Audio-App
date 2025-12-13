@@ -45,3 +45,4 @@ task_analysis_parser.py
 /android/app/.cxx
 /android/.gradle
 /android/build
+logs

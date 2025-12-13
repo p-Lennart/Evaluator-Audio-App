@@ -1,0 +1,28 @@
+{
+  "_comment": "Configuration for asset generation script. To add a new piece, add an entry with its name and BPM variants.",
+  "_usage": "npm run generate-assets",
+  "pieces": {
+    "air_on_the_g_string": {
+      "bpms": [100],
+      "description": "Air on the G String - Bach"
+    },
+    "schumann_melodyVLCduet": {
+      "bpms": [100],
+      "description": "Schumann Melody VLC Duet"
+    },
+    "ode_to_joy": {
+      "bpms": [100, 110, 300],
+      "description": "Ode to Joy - Beethoven"
+    },
+    "hark": {
+      "bpms": [100, 110],
+      "description": "Hark! The Herald Angels Sing"
+    },
+    "green_sleeves": {
+      "bpms": [100, 200, 220],
+      "description": "Greensleeves - Traditional"
+    }
+  },
+  "defaultBpm": 100,
+  "_note": "If a piece folder exists but is not in this config, defaultBpm will be used"
+}

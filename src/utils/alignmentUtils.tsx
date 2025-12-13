@@ -43,8 +43,19 @@ export const calculateWarpedTimes = (
   stepSize: number,
   refTimes: number[],
   enforceNonDecreasing = true,
-  debug = false
+  debug = false,
+  usePerfectTimestamps = false, // Debug mode: use refTimes directly
 ): number[] => {
+  // Debug test: return perfect timestamps to isolate cursor lag issues
+  if (usePerfectTimestamps) {
+    console.log("DEBUG MODE: Using perfect timestamps (refTimes directly)");
+    console.log("- This bypasses DTW interpolation completely");
+    console.log("- If cursor lag disappears: problem is in DTW/interpolation");
+    console.log("- If cursor lag persists: problem is elsewhere");
+    console.log("Sample perfect timestamps:", refTimes.slice(0, 5));
+    return [...refTimes]; // Direct copy of reference times
+  }
+
   if (!warpingPath || warpingPath.length === 0) return refTimes.map(() => 0);
 
   // Build arrays of path times (seconds)
