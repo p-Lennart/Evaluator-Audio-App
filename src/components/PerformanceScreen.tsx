@@ -9,7 +9,7 @@ import {
   getScoreRefAudio,
 } from "../score_name_to_data_map/unifiedScoreMap";
 
-import { intonationToNoteColor } from "../audio/Intonation";
+import { calculateIntonation, intonationToNoteColor } from '../audio/Intonation';
 import { NoteColor } from "../utils/musicXmlUtils";
 import { ScoreFollower } from "../audio/ScoreFollower";
 import { prepareAudio } from "../utils/audioUtils";
@@ -23,36 +23,7 @@ interface PerformanceScreenProps {
   state: any;
 }
 
-const BUFFER_SIZE = 5;
 const ADVANCE_THRESHOLD = 0.2;
-
-class test_FrameBuffer {
-  buffer: number[];
-  capacity: number;
-  size: number;
-
-  constructor(capacity: number) {
-    this.buffer = [];
-    this.capacity = capacity;
-    this.size = 0;
-  }
-
-  insert(audioFrame: number[]) {
-    this.buffer = this.buffer.concat(audioFrame);
-    this.size += 1;
-  }
-
-  flush(): number[] {
-    const result = this.buffer;
-    this.buffer = [];
-    this.size = 0;
-    return result;
-  }
- 
-  isFull() {
-    return this.size >= this.capacity;
-  }
-}
 
 export default function PerformanceScreen({
   score,
@@ -62,19 +33,24 @@ export default function PerformanceScreen({
   state,
 }: PerformanceScreenProps) {
   const expNoteIdxRef = useRef<number>(0);
-  const frameBufferRef = useRef<test_FrameBuffer | null>(null);
   const noteColorsRef = useRef<NoteColor[]>([]);
   const csvDataRef = useRef<CSVRow[]>([]); 
-  const scoreFollowerRef = useRef<ScoreFollower | null>(null);
   
-
   const [testInput, setTestInput] = useState<number>(0);
+
+  useEffect(() => {
+    // const subscription = audioEvents.addListener("onPitchDetected", handlePitchUpdate);
+
+    return () => {
+      // subscription.remove();
+      // AudioPerformanceModule.stopProcessing();
+    };
+  }, [dispatch]); 
 
   const runPerformance = async () => {
     if (!score) return;
 
     expNoteIdxRef.current = 0;
-    frameBufferRef.current = new test_FrameBuffer(BUFFER_SIZE);
     noteColorsRef.current = [];
 
     const base = score.replace(/\.musicxml$/, "");
@@ -82,51 +58,20 @@ export default function PerformanceScreen({
     const noteTable = await loadCsvInfo(csvUri);
     csvDataRef.current = noteTable; 
 
-    const isNbn = true;
-    if (!isNbn) {
-      // Use unified mapping for cross-platform file access
-      const refUri = getScoreRefAudio(base);
-      scoreFollowerRef.current = await ScoreFollower.create(refUri, CENSFeatures); // Initialize score follower
-    }
-
-    dispatch({
-        type: "SET_NOTE_COLORS",
-        payload: [],
-    });
-
     console.log("Isplaying=", state.playing, "\nDispatch start/stop");
+    dispatch({ type: "SET_NOTE_COLORS", payload: [] });
     dispatch({ type: "start/stop" });
-    
-    // useMicStream({}, (frame) => processAudioFrame(frame));
   };
 
-  const processAudioFrameNBN = (audioFrame: number[]) => {
-    if (!state.playing) {
-      return;
-    }      
-
-    frameBufferRef.current.insert(audioFrame);
-    // keep populating buffer if not full
-    console.log("Check if full", frameBufferRef.current.capacity, frameBufferRef.current.size);
-    if (!frameBufferRef.current.isFull()) return;
-
-    // flush buffer
-    const audioBufferContents = frameBufferRef.current.flush();
-    
-    // process buffer
-
-    const expNoteIndex = expNoteIdxRef.current;
+  const handlePitchUpdate = (freq: number) => {
     const noteTable: CSVRow[] = csvDataRef.current;
-
-    // cap runaway index
-    if (expNoteIndex >= noteTable.length) {
-      expNoteIdxRef.current = noteTable.length;
-      return;
-    };
+    const expNoteIndex = expNoteIdxRef.current;
+    
+    if (!noteTable || expNoteIndex >= noteTable.length) return;
 
     const targetNote = noteTable[expNoteIndex];
-    const intonation = test_dummy_calcIntonation(audioBufferContents, targetNote);
     
+    const intonation: number = calculateIntonation(freq, targetNote);
     // silence or no note
     if (Number.isNaN(intonation)) return;
 
@@ -151,46 +96,25 @@ export default function PerformanceScreen({
     }
   }
 
-  const processAudioFrameDTW = (audioFrame: number[]) => {
-    if (!state.playing) {
-      return;
-    }
-    
+  const handleTimePitchUpdate = (estTime: number, freq: number) => {
     let expNoteIndex = expNoteIdxRef.current;
     const noteTable: CSVRow[] = csvDataRef.current;
-
-    // cap runaway index
-    if (expNoteIndex >= noteTable.length) {
-      expNoteIdxRef.current = noteTable.length;
-      dispatch({ type: "start/stop" }); // stop
-      return;
-    };
-
-    // advance to next unreached note
+    
     let targetTime = noteTable[expNoteIndex].refTime;
-    const estTime = scoreFollowerRef.current.step(audioFrame);
-
-    if (estTime < targetTime) {
-      frameBufferRef.current.insert(audioFrame);
-      return;
-    }
-
-    const prevNoteIndex = expNoteIndex;
-
+    
     while (estTime >= targetTime && expNoteIndex < noteTable.length) {
       expNoteIndex += 1;
       expNoteIdxRef.current = expNoteIndex;
+      
       targetTime = noteTable[expNoteIndex].refTime;
       console.log(expNoteIndex, noteTable.length);
     }
-
-    const beat = noteTable[expNoteIdxRef.current].beat;
+   
+    const targetNote = noteTable[expNoteIdxRef.current];
+    const beat = targetNote.beat;
     dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
 
-    const lastNoteBuffer = frameBufferRef.current.flush();
-    const targetNote = noteTable[prevNoteIndex];
-
-    const intonation = test_calcIntonation(lastNoteBuffer, targetNote);
+    const intonation = calculateIntonation(freq, targetNote);
     
     // silence or no note
     if (Number.isNaN(intonation)) return;
@@ -202,101 +126,20 @@ export default function PerformanceScreen({
         type: "SET_NOTE_COLORS",
         payload: noteColorsRef.current.filter(Boolean),
     });
-  }
-
-  function test_calcIntonation(frameBuffer: number[], targetNote: CSVRow) {
-    if (frameBuffer.length < 2) {
+  } 
+  function calculateIntonation(freq: number, targetNote: CSVRow) {
+    if (freq < 0) {
       return NaN;
     }
 
-    const mcleod = PitchDetector.forNumberArray(frameBuffer.length);
-    const [mcleodFrequency, mcleodFrequencyClarity] = mcleod.findPitch(
-      frameBuffer,
-      44100,
-    );
-    
-    if (mcleodFrequency < 0) {
-      return NaN;
-    }
-
-    const midi = 69 + 12 * Math.log2(mcleodFrequency / 440);
+    const midi = 69 + 12 * Math.log2(freq / 440);
     const intonation = targetNote.midi - midi;
 
     return intonation % 12;
 }
 
-function test_dummy_calcIntonation(frameBuffer: number[], targetNote: CSVRow) {
-    // temporary test function = mean
-    if (frameBuffer.length === 0) return NaN; 
-    
-    let sum = 0;
-    let denom = 0;
-    for (let f of frameBuffer) {
-      if (Number.isNaN(f)) continue;
-      sum += f;
-      denom += 1;
-    }
-
-    if (denom <= frameBuffer.length * 0.75) return NaN;
-
-    return sum / denom;
-  }
-
   const testNbnOnce = () => {
-    processAudioFrameNBN([testInput]);
-  }
-
-  const testDtwFull = async () => {
-
-    const base = score.replace(/\.musicxml$/, "");
-    const refUri = getScoreRefAudio(base);
-
-    const audioData = await prepareAudio(refUri, 44100);
-
-    const HOP = 4096;
-    const FRAME = 4096;
-  
-    await testProcessAudioFrames(audioData, FRAME, HOP, (frame, index) => {
-      processAudioFrameDTW(frame);
-    });
-  }
-
-  const testNbnFull = async () => {
-
-    const base = score.replace(/\.musicxml$/, "");
-    const refUri = getScoreRefAudio(base);
-
-    const audioData = await prepareAudio(refUri, 44100);
-
-    const HOP = 4096;
-    const FRAME = 4096;
-  
-    await testProcessAudioFrames(audioData, FRAME, HOP, (frame, index) => {
-      // console.log("Frame", index);
-      processAudioFrameNBN(frame);
-    });
-  }
-
-  async function testProcessAudioFrames(
-    audioData: Float32Array,
-    frameSize: number,
-    hopSize: number,
-    onFrame: (frame: number[], frameIndex: number) => void
-  ) {
-    const totalSamples = audioData.length;
-    let frameIndex = 0;
-
-    // Iterate frame-by-frame
-    for (let start = 0; start + frameSize <= totalSamples; start += hopSize) {
-      const frameView = audioData.subarray(start, start + frameSize);
-      // temporary inefficient requirement: convert Float32Array -> number[]
-      const frameAsNumberArray = Array.from(frameView);
-
-      onFrame(frameAsNumberArray, frameIndex);
-      frameIndex++;
-
-      await new Promise(r => setTimeout(r, 100)); // tmp delay for debugging
-    }
+    handlePitchUpdate(testInput);
   }
 
   return (
@@ -340,28 +183,6 @@ function test_dummy_calcIntonation(frameBuffer: number[], targetNote: CSVRow) {
         disabled={state.score === "" || !state.playing} // Disabled when no score is selected or not playing performance
       >
       <Text style={styles.buttonText}>NBN: Feed Test Frame</Text>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={[
-          styles.button,
-          (state.score === "" || !state.playing) &&
-            styles.disabledButton,
-        ]}
-        onPress={testNbnFull}
-        disabled={state.score === "" || !state.playing} // Disabled when no score is selected or not playing performance
-      >
-      <Text style={styles.buttonText}>NBN: Feed all audio frames</Text>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={[
-          styles.button,
-          (state.score === "" || !state.playing) &&
-            styles.disabledButton,
-        ]}
-        onPress={testDtwFull}
-        disabled={state.score === "" || !state.playing} // Disabled when no score is selected or not playing performance
-      >
-      <Text style={styles.buttonText}>DTW: Feed all audio frames</Text>
       </TouchableOpacity>
     </View>
   );
