@@ -317,19 +317,28 @@ export default function ScoreFollowerTest({
       const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
         if (!status.isLoaded) return;
         const currentTimeSec = status.positionMillis / 1000;
-      while (
-        nextIndexRef.current < csvDataRef.current.length &&
-        currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
-      ) {
-        const beat = csvDataRef.current[nextIndexRef.current].beat;
-        const predictedTime = csvDataRef.current[nextIndexRef.current].predictedTime;
-        console.log(`Audio time: ${currentTimeSec.toFixed(3)}s, Note time: ${predictedTime.toFixed(3)}s, Beat: ${beat}`);
-        nextIndexRef.current++;
+        while (
+          nextIndexRef.current < csvDataRef.current.length &&
+          currentTimeSec >= csvDataRef.current[nextIndexRef.current].predictedTime
+        ) {
+          const beat = csvDataRef.current[nextIndexRef.current].beat;
+          const predictedTime = csvDataRef.current[nextIndexRef.current].predictedTime;
+          console.log(`Audio time: ${currentTimeSec.toFixed(3)}s, Note time: ${predictedTime.toFixed(3)}s, Beat: ${beat}`);
+          nextIndexRef.current++;
 
-        // Unified cursor control via state dispatch
-        // Pass audioTime for lag analysis logging
-        dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat, audioTime: currentTimeSec } as any);  
-      }
+          // Unified cursor control via state dispatch
+          // Pass audioTime for lag analysis loggingf
+          var noteColors = []
+          // Calculate note colors up to the current index
+          for (let i = 0; i < nextIndexRef.current; i++) {
+            const intonation = csvDataRef.current[i].intonation;
+            const color = intonationToNoteColor(intonation, i);
+            noteColors.push(color);
+          }
+          console.log(noteColors,"NOTE COLOR HERE")
+          dispatch({ type: "SET_NOTE_COLORS", payload: noteColors }); 
+          dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat, audioTime: currentTimeSec } as any);  
+        }
         if (status.didJustFinish) {
           dispatch({ type: "start/stop" }); // Toggle "playing" boolean (to false in this case)
           dispatch({ type: "SET_NOTE_COLORS", payload: [] }); 
