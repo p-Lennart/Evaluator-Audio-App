@@ -17,13 +17,7 @@ import ScoreDisplay from "./src/components/ScoreDisplay";
 import Icon from "react-native-vector-icons/Feather";
 import { CENSFeatures } from "./src/audio/FeaturesCENS";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
-import { ExpoMicProcessor } from "./src/audio/ExpoMicProcessor";
 import ScoreFollowerTest from "./src/components/ScoreFollowerTest";
-import {
-  initNativeAudio,
-  initWebAudio,
-  stopLiveAudio,
-} from "./src/utils/liveMicUtils";
 import { useThemeAnimations } from "./src/utils/themeUtils";
 import LoginScreen from "./src/components/LoginScreen";
 import PerformanceStats from "./src/components/PerformanceStats";
@@ -58,31 +52,14 @@ export default function App() {
       loadingPerformance: false, // Boolean indicator to let other components know if we are currently loading a performance or not to enable or disable certain functions
     },
   );
-
-  const [chroma, setChroma] = useState<number[]>(new Array(12).fill(0)); // Initialize the chroma state as an array of 12 zeros (used to capture chroma vector at each chunk of audio).
-  const [started, setStarted] = useState(false); // State used to determine user toggled the live microphone option or not
+  
   const [isLoggedIn, setIsLoggedIn] = useState(false); // State to track if user is logged in
   const [showStats, setShowStats] = useState(false); // State to toggle statistics view
   const [currentUser, setCurrentUser] = useState<string | null>(null); // State to store current username
 
-  const processor = useRef(new ExpoMicProcessor()).current; // Create a stable ExpoMicProcessor instance
   const SAMPLE_RATE = 44100; // Define sample rate for ChromaMaker
   const N_FFT = 4096; // Define chunk size for ChromaMaker
   const chromaMaker = useRef(new CENSFeatures(SAMPLE_RATE, N_FFT)).current; // Create a stable ChromaMaker instance
-
-  // Initialize mic to capture live audio when "started" state changes (on mic icon click)
-  useEffect(() => {
-    if (started) {
-      if (Platform.OS === "web") {
-        initWebAudio(setChroma, chromaMaker).catch(console.error); // Web version of live mic
-      } else {
-        initNativeAudio(setChroma, processor, chromaMaker).catch(console.error); // Mobile version of live mic
-      }
-    }
-    return () => {
-      stopLiveAudio(processor); // Stop and clean up live microphone on unmount
-    };
-  }, [started]);
 
   const {
     theme, // Variable used to determine the colors of the following styles
@@ -201,17 +178,6 @@ export default function App() {
               />
             </TouchableOpacity>
             {/* Light & Dark Mode is disabled for now - due to not looking too good after adding more stuff */}
-            <TouchableOpacity
-              disabled={true}
-              onPress={() => setStarted(!started)}
-            >
-              <FontAwesome
-                name={started ? "microphone" : "microphone-slash"}
-                size={isSmallScreen ? 15 : 30}
-                color="grey"
-              />
-            </TouchableOpacity>
-            {/* Live mic is work in progress with online dtw - also disabled */}
             <TouchableOpacity disabled={true} onPress={toggleTheme}>
               <Icon
                 name={theme === "light" ? "sun" : "moon"}

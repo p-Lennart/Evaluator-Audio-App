@@ -1,19 +1,19 @@
 import React, { useState, useRef, useEffect, } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, TextInput } from "react-native";
 
+import { NativeModules, Platform, NativeEventEmitter, Alert } from "react-native";
+
+import { requestMicrophonePermission } from "../utils/liveMicUtils";
+
 import { CENSFeatures } from "../audio/FeaturesCENS";
 import { FeaturesConstructor } from "../audio/Features";
 import { CSVRow, loadCsvInfo } from '../utils/csvParsingUtils';
 import { 
   getScoreCSVData,
-  getScoreRefAudio,
 } from "../score_name_to_data_map/unifiedScoreMap";
 
-import { calculateIntonation, intonationToNoteColor } from '../audio/Intonation';
+import { intonationToNoteColor } from '../audio/Intonation';
 import { NoteColor } from "../utils/musicXmlUtils";
-import { ScoreFollower } from "../audio/ScoreFollower";
-import { prepareAudio } from "../utils/audioUtils";
-import { PitchDetector } from "pitchy";
 
 interface PerformanceScreenProps {
   score: string; // Selected score name
@@ -25,6 +25,19 @@ interface PerformanceScreenProps {
 
 const ADVANCE_THRESHOLD = 0.2;
 
+let AudioPerformanceModule: any;
+if (Platform.OS === "android") {
+  try {
+    console.log("Loading AudioPerformanceModule...");
+    AudioPerformanceModule = NativeModules.AudioPerformanceModule;
+    console.log("AudioPerformanceModule instance:", AudioPerformanceModule);
+  } catch (e) {
+    console.log("Failed to load AudioPerformanceModule: ", e);
+  }
+}
+
+const audioEvents = new NativeEventEmitter(AudioPerformanceModule);
+
 export default function PerformanceScreen({
   score,
   dispatch,
@@ -35,19 +48,30 @@ export default function PerformanceScreen({
   const expNoteIdxRef = useRef<number>(0);
   const noteColorsRef = useRef<NoteColor[]>([]);
   const csvDataRef = useRef<CSVRow[]>([]); 
-  
+
+  const [isProcessing, setIsProcessing] = useState(false);
   const [testInput, setTestInput] = useState<number>(0);
 
   useEffect(() => {
-    // const subscription = audioEvents.addListener("onPitchDetected", handlePitchUpdate);
+    console.log("Adding subscription to audio events");
+    const subscription = audioEvents.addListener("onPitchDetected", handlePitchUpdate);
+    console.log("Subscription:", subscription);
 
     return () => {
-      // subscription.remove();
-      // AudioPerformanceModule.stopProcessing();
+      console.log("Subscription teardown");
+      subscription.remove();
+      AudioPerformanceModule.stopProcessing();
+      setIsProcessing(false);
     };
   }, [dispatch]); 
 
   const runPerformance = async () => {
+    const hasPermission = await requestMicrophonePermission();
+    if (!hasPermission) {
+      Alert.alert("Permission Denied", "Microphone access is required to run the performance.");
+      return;
+    }
+
     if (!score) return;
 
     expNoteIdxRef.current = 0;
@@ -61,9 +85,15 @@ export default function PerformanceScreen({
     console.log("Isplaying=", state.playing, "\nDispatch start/stop");
     dispatch({ type: "SET_NOTE_COLORS", payload: [] });
     dispatch({ type: "start/stop" });
+
+    // Start Native Audio Engine
+    await AudioPerformanceModule.startProcessing();
+    setIsProcessing(true);
   };
 
   const handlePitchUpdate = (freq: number) => {
+    console.log("Pitch update:", freq);
+
     const noteTable: CSVRow[] = csvDataRef.current;
     const expNoteIndex = expNoteIdxRef.current;
     
@@ -76,7 +106,7 @@ export default function PerformanceScreen({
     if (Number.isNaN(intonation)) return;
 
     // update note color of latest attempt
-    console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current, "state", state.noteColors);
+    console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current);
     noteColorsRef.current[expNoteIndex] = intonationToNoteColor(intonation, expNoteIndex);
     dispatch({
         type: "SET_NOTE_COLORS",
@@ -120,7 +150,7 @@ export default function PerformanceScreen({
     if (Number.isNaN(intonation)) return;
 
     // update note color of latest attempt
-    console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current, "state", state.noteColors);
+    console.log("Intonation", intonation);
     noteColorsRef.current[expNoteIndex] = intonationToNoteColor(intonation, expNoteIndex);
     dispatch({
         type: "SET_NOTE_COLORS",
@@ -160,8 +190,19 @@ export default function PerformanceScreen({
         disabled={state.score === "" || state.playing} // Disabled when no score is selected or already playing performance
       >
         <Text style={styles.buttonText}>
-          {state.playing ? "Running..." : "Play"}
+          {state.playing ? "Listening..." : "Play"}
         </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => {
+           AudioPerformanceModule.stopProcessing();
+           dispatch({ type: "start/stop" });
+        }}
+        disabled={state.score === "" || !state.playing}
+      >
+        <Text style={styles.buttonText}>Stop</Text>
       </TouchableOpacity>
 
 
