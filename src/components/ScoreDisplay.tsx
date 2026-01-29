@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
 } from "react-native";
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import { Cursor, OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import scoresData from "../score_name_to_data_map/scoreToMusicxmlMap"; // Local mapping of score filenames to XML content
 import { WebView } from "react-native-webview";
@@ -122,7 +122,7 @@ export default function ScoreDisplay({
     if (!noteColors || !noteColors.length) return;
     // MOBILE branch
     if (Platform.OS !== "web") {
-      console.log("RN->Web message: color notes, len=", noteColors.length);
+      // console.log("RN->Web message: color notes, len=", noteColors.length);
       webviewRef.current?.postMessage(JSON.stringify({
         type: "colorNotes",
         noteColors: noteColors,
@@ -172,10 +172,35 @@ export default function ScoreDisplay({
     scoresData[state.score] ||
     ""; // Get selected xml data from given the current score's name
 
+  // Memoize the html source to prevent WebView reloading on every render
+  const htmlSource = useMemo(() => {
+    return { html: buildOsmdHtmlForNative(baseXml) };
+  }, [baseXml]);
+
+  const prevNoteColorsRef = useRef<NoteColor[]>([]);
+
   // Runtime refresh
   useEffect(() => {
-    console.log("colornote state change");
-    colorNotesInOSMD(state.noteColors);
+    // console.log("colornote state change");
+    const current = state.noteColors || [];
+    const prev = prevNoteColorsRef.current;
+    const diff: NoteColor[] = [];
+    
+    // Simple diff: iterate current, check against prev
+    // state.noteColors is a sparse array where index matches note index
+    current.forEach((note: NoteColor, index: number) => {
+        const prevNote = prev[index];
+        if (!prevNote || prevNote.color !== note.color) {
+            diff.push(note);
+        }
+    });
+
+    if (diff.length > 0) {
+        colorNotesInOSMD(diff);
+    }
+    
+    // Update ref to current state (shallow copy is fine, dispatch new arrays)
+    prevNoteColorsRef.current = current;
   }, [state.noteColors]);
 
   return (
@@ -215,7 +240,7 @@ export default function ScoreDisplay({
           <WebView
             ref={webviewRef}
             originWhitelist={["*"]}
-            source={{ html: buildOsmdHtmlForNative(baseXml) }} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
+            source={htmlSource} // Initialize OSMD display and its own separate cursor mvoement logic (same as web)
             onMessage={(e) =>
               onHandleOsmdMessageForNative(e.nativeEvent.data, dispatch)
             } // Call function when page inside this Webview calls postMessage

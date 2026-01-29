@@ -1,7 +1,7 @@
 import { NoteColor } from "../utils/musicXmlUtils";
 
 const reducer_function = (state: any, action: any) => {
-  console.log("Dispatch received.");
+  // console.log("Dispatch received.");
   // Conventions vary, but this one is rather common - the action argument
   // should be an object with the type property; this determines what type
   // of action to carry out on the state.  The action can have other properties;
@@ -63,35 +63,42 @@ const reducer_function = (state: any, action: any) => {
       };
 
     case "change_reference_audio": // Keep the existing state and update the URI for reference audio
-      console.log(
-        "[reducer] referenceAudioUri stored in state:",
-        action.referenceAudioUri,
-      );
+      // console.log(
+      //   "[reducer] referenceAudioUri stored in state:",
+      //   action.referenceAudioUri,
+      // );
       return {
         ...state,
         referenceAudioUri: action.referenceAudioUri as string,
       };
 
     case "SET_ESTIMATED_BEAT": // Keep the existing state and update estimatedBeat variable
-      console.log("[reducer] Estimated beat:", action.payload);
+      // console.log("[reducer] Estimated beat:", action.payload);
       return {
         ...state,
         estimatedBeat: action.payload as number,
       };
 
     case "SET_ESTIMATED_PITCH": // Keep the existing state and  update estimatedBeat variable
-      console.log("[reducer] Estimated pitch:", action.payload);
+      // console.log("[reducer] Estimated pitch:", action.payload);
       return {
         ...state,
         estimatedPitch: action.payload as number,
       };
 
     case "SET_NOTE_COLORS":
-      console.log("[reducer] # of note colors:", action.payload.length);
+      // console.log("[reducer] # of note colors:", action.payload.length);
       return {
         ...state,
-        // cloned payload to allow passing the same mutated array
-        noteColors: [...action.payload] as NoteColor[],
+        noteColors: action.payload as NoteColor[],
+      };
+
+    case "ADD_NOTE_COLOR":
+      const newNoteColors = [...state.noteColors];
+      newNoteColors[action.payload.index] = action.payload.color;
+      return {
+        ...state,
+        noteColors: newNoteColors,
       };
 
     case "change_bottom_audio": // Keep the existing state and update the URI for playback audio (second instrument - only used in Companion Project) audio

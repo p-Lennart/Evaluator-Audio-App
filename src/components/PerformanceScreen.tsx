@@ -51,6 +51,24 @@ export default function PerformanceScreen({
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [testInput, setTestInput] = useState<number>(0);
+  const updateScheduled = useRef<boolean>(false);
+  const latestBeat = useRef<number>(0);
+  const lastDispatchedBeat = useRef<number | null>(null);
+
+  const scheduleBeatUpdate = (beat: number) => {
+    latestBeat.current = beat;
+    if (!updateScheduled.current) {
+      updateScheduled.current = true;
+      requestAnimationFrame(() => {
+        if (latestBeat.current !== lastDispatchedBeat.current) {
+            dispatch({ type: "SET_ESTIMATED_BEAT", payload: latestBeat.current });
+            lastDispatchedBeat.current = latestBeat.current;
+        }
+        updateScheduled.current = false;
+      });
+    }
+  };
+
 
   useEffect(() => {
     console.log("Adding subscription to audio events");
@@ -92,7 +110,7 @@ export default function PerformanceScreen({
   };
 
   const handlePitchUpdate = (freq: number) => {
-    console.log("Pitch update:", freq);
+    // console.log("Pitch update:", freq);
 
     const noteTable: CSVRow[] = csvDataRef.current;
     const expNoteIndex = expNoteIdxRef.current;
@@ -106,23 +124,28 @@ export default function PerformanceScreen({
     if (Number.isNaN(intonation)) return;
 
     // update note color of latest attempt
-    console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current);
-    noteColorsRef.current[expNoteIndex] = intonationToNoteColor(intonation, expNoteIndex);
-    dispatch({
-        type: "SET_NOTE_COLORS",
-        payload: noteColorsRef.current,
-    });
+    // console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current);
+    const newNoteColor = intonationToNoteColor(intonation, expNoteIndex);
+    
+    // Check if color actually changed to avoid unnecessary re-renders/bridge traffic
+    if (noteColorsRef.current[expNoteIndex]?.color !== newNoteColor.color) {
+        noteColorsRef.current[expNoteIndex] = newNoteColor;
+        dispatch({
+            type: "ADD_NOTE_COLOR",
+            payload: { color: newNoteColor, index: expNoteIndex },
+        });
+    }
 
     // if attempt within range, advance note
     if (Math.abs(intonation) < ADVANCE_THRESHOLD) {
-      console.log("Abs of", intonation, "was within threshold", ADVANCE_THRESHOLD);
+      // console.log("Abs of", intonation, "was within threshold", ADVANCE_THRESHOLD);
       expNoteIdxRef.current = expNoteIndex + 1;
     } 
 
     if (expNoteIdxRef.current < noteTable.length) {
       const beat = noteTable[expNoteIdxRef.current].beat;
       // update beat to move cursor 
-      dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat }); 
+      scheduleBeatUpdate(beat); 
     }
   }
 
@@ -142,7 +165,7 @@ export default function PerformanceScreen({
    
     const targetNote = noteTable[expNoteIdxRef.current];
     const beat = targetNote.beat;
-    dispatch({ type: "SET_ESTIMATED_BEAT", payload: beat });
+    scheduleBeatUpdate(beat);
 
     const intonation = calculateIntonation(freq, targetNote);
     
@@ -150,12 +173,17 @@ export default function PerformanceScreen({
     if (Number.isNaN(intonation)) return;
 
     // update note color of latest attempt
-    console.log("Intonation", intonation);
-    noteColorsRef.current[expNoteIndex] = intonationToNoteColor(intonation, expNoteIndex);
-    dispatch({
-        type: "SET_NOTE_COLORS",
-        payload: noteColorsRef.current.filter(Boolean),
-    });
+    // console.log("Intonation", intonation);
+    const newNoteColor = intonationToNoteColor(intonation, expNoteIndex);
+    
+    // Check if color actually changed to avoid unnecessary re-renders/bridge traffic
+    if (noteColorsRef.current[expNoteIndex]?.color !== newNoteColor.color) {
+        noteColorsRef.current[expNoteIndex] = newNoteColor;
+        dispatch({
+            type: "ADD_NOTE_COLOR",
+            payload: { color: newNoteColor, index: expNoteIndex },
+        });
+    }
   } 
   function calculateIntonation(freq: number, targetNote: CSVRow) {
     if (freq < 0) {

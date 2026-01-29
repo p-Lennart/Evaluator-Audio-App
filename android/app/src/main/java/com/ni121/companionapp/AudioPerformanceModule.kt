@@ -88,20 +88,20 @@ class AudioPerformanceModule(reactContext: ReactApplicationContext) : ReactConte
         }
     }
 
+    private var lastEventTime: Long = 0
+
     private fun processAudioStream() {
         val buffer = ShortArray(PROCESSING_BUFFER_SIZE)
         val floatBuffer = FloatArray(PROCESSING_BUFFER_SIZE)
         val fastYin = FastYin(SAMPLE_RATE.toFloat(), PROCESSING_BUFFER_SIZE)
 
-        Log.d("AudioPerf", "THREAD STARTED: processing loop beginning") // Checkpoint 1
+        // Log.d("AudioPerf", "THREAD STARTED: processing loop beginning") // Checkpoint 1
 
         while (isRecording.get()) {
             val readResult = audioRecord?.read(buffer, 0, PROCESSING_BUFFER_SIZE) ?: 0
 
             if (readResult > 0) {
-                // Checkpoint 2: Are we getting data?
-                // (Uncomment this if you suspect the mic isn't reading at all)
-                // Log.d("AudioPerf", "Read bytes: $readResult") 
+                // Log.d("AudioPerf", "Read bytes: $readResult") // Checkpoint 2
 
                 for (i in 0 until readResult) {
                     floatBuffer[i] = buffer[i].toFloat()
@@ -111,15 +111,16 @@ class AudioPerformanceModule(reactContext: ReactApplicationContext) : ReactConte
                 val pitch = detectionResult.pitch
                 val probability = detectionResult.probability
 
-                // Checkpoint 3: What is the algorithm seeing? 
-                // Log EVERYTHING for now to ensure the math is working.
-                if (pitch != -1.0f) {
-                    Log.d("AudioPerf", "Pitch: $pitch, Prob: $probability")
-                }
+                // Checkpoint 3
+                // if (pitch != -1.0f) {
+                //    Log.d("AudioPerf", "Pitch: $pitch, Prob: $probability")
+                // }
 
-                if (pitch > 0 && probability > YIN_PROB_GATE) { 
+                val currentTime = System.currentTimeMillis()
+                if (pitch > 0 && probability > YIN_PROB_GATE && (currentTime - lastEventTime > 50)) { 
                     sendEvent("onPitchDetected", pitch.toDouble())
-                    Log.d("AudioPerf", "EMITTED EVENT") // Checkpoint 4
+                    lastEventTime = currentTime
+                    // Log.d("AudioPerf", "EMITTED EVENT") // Checkpoint 4
                 }
             } else {
                 Log.w("AudioPerf", "AudioRecord read returned error or 0: $readResult")

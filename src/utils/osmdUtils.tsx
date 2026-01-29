@@ -406,7 +406,7 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
             // Re-render
             try {
               osm.render();
-              console.log("[WebView] Applied", noteColors.length, "note colors");
+              // console.log("[WebView] Applied", noteColors.length, "note colors");
             } catch (e) {
               console.error("[WebView] osmd.render() failed", e);
             }
@@ -520,10 +520,10 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
         function handleRNMessage(event) {
           try {
             // Log raw event for debugging
-            console.log("[WebView] Raw event received:", JSON.stringify(event));
+            // console.log("[WebView] Raw event received:", JSON.stringify(event));
             
             const msg = JSON.parse(event.data);
-            console.log("[WebView] RN->WebView message:", msg);
+            // console.log("[WebView] RN->WebView message:", msg);
 
             // Handle note coloring
             if (msg.type === "colorNotes" && Array.isArray(msg.noteColors)) {
@@ -587,7 +587,7 @@ export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
           tempo: data.tempo ?? null,
           beatsPerMeasure: data.beatsPerMeasure ?? null,
         });
-        console.log(`[WebView] OSMD loaded: tempo=${data.tempo}, beatsPerMeasure=${data.beatsPerMeasure}`);
+        // console.log(`[WebView] OSMD loaded: tempo=${data.tempo}, beatsPerMeasure=${data.beatsPerMeasure}`);
         break;
 
       // ---- Console messages (bridge from webview) ----
@@ -600,13 +600,13 @@ export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
 
       // ---- Color note confirmation ----
       case "colorNotesAck":
-        console.log(`[WebView] Applied ${data.count} note color updates`);
+        // console.log(`[WebView] Applied ${data.count} note color updates`);
         // Optional dispatch: dispatch({ type: "color_notes_applied", count: data.count });
         break;
       
       // ---- Cursor movement confirmation ----
       case "cursorMovedAck":
-        console.log(`[WebView] Cursor moved to beat ${data.targetBeats}`);
+        // console.log(`[WebView] Cursor moved to beat ${data.targetBeats}`);
         break;
 
       // ---- Unknown message type ----
