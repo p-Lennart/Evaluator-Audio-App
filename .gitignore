@@ -46,3 +46,7 @@ task_analysis_parser.py
 /android/.gradle
 /android/build
 logs
+
+# Auto-generated asset mappings
+public/assetMappings.json
+src/score_name_to_data_map/generatedAssetMappings.ts
