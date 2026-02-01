@@ -5,7 +5,7 @@ export interface UserAccount {
   username: string;
   password: string; // Non-encrypted password stored as plain text
   createdAt: string;
-  performances: PerformanceData[];
+  performances: (PerformanceData | PerformanceDataNotebyNote)[];
 }
 
 export interface PerformanceData {
@@ -16,6 +16,16 @@ export interface PerformanceData {
   csvData: any[];
   warpingPath: [number, number][];
   tempo: number;
+}
+
+export interface PerformanceDataNotebyNote {
+  id: string;
+  scoreName: string;
+  timestamp: string;
+  tempo: number;
+  numsharp:number;
+  numflat:number;
+  avgtunetime:number;
 }
 
 export const createAccount = async (username: string, password: string): Promise<UserAccount | null> => {
@@ -80,7 +90,7 @@ export const getAllUsers = async (): Promise<UserAccount[]> => {
   return users.map(([_, value]) => JSON.parse(value!));
 };
 
-export const savePerformanceData = async (performanceData: PerformanceData): Promise<void> => {
+export const savePerformanceData = async (performanceData: PerformanceData | PerformanceDataNotebyNote): Promise<void> => {
   const user = await getCurrentUser();
   if (!user) {
     console.log('No user logged in');

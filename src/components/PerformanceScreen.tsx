@@ -15,6 +15,8 @@ import {
 import { intonationToNoteColor } from '../audio/Intonation';
 import { NoteColor } from "../utils/musicXmlUtils";
 
+import { getCurrentUser, savePerformanceData, PerformanceDataNotebyNote } from "../utils/accountUtils";
+
 interface PerformanceScreenProps {
   score: string; // Selected score name
   dispatch: (action: { type: string; payload?: any }) => void; // Dispatch function used to update global state
@@ -54,6 +56,24 @@ export default function PerformanceScreen({
   const updateScheduled = useRef<boolean>(false);
   const latestBeat = useRef<number>(0);
   const lastDispatchedBeat = useRef<number | null>(null);
+
+  const [performanceComplete, setPerformanceComplete] = useState(false); // State to determine if plackback of a score is finished or not
+  const [performanceSaved, setPerformanceSaved] = useState(false); // State to track if performance has been saved
+  
+  const performanceMetrics=useRef({//for note by note keep track of
+    sharp_ct:0, //# notes initailly sharp/flat
+    flat_ct:0,
+    tune_time:0,//and avg time to get notes in tune..
+    tune_ct:0,
+  })
+
+  const noteTracking=useRef<{//also track when notes start/stop for measurements
+    [note_ind:number]: {
+      initial_time:number;
+      started:boolean;
+      intune:boolean;
+    }
+  }>({});
 
   const scheduleBeatUpdate = (beat: number) => {
     latestBeat.current = beat;
@@ -95,6 +115,14 @@ export default function PerformanceScreen({
     expNoteIdxRef.current = 0;
     noteColorsRef.current = [];
 
+    performanceMetrics.current={//initialize values in runPerformance
+      sharp_ct:0,
+      flat_ct:0,
+      tune_time:0,
+      tune_ct:0,
+    };
+    noteTracking.current={};
+
     const base = score.replace(/\.musicxml$/, "");
     const csvUri = getScoreCSVData(base);
     const noteTable = await loadCsvInfo(csvUri);
@@ -126,6 +154,27 @@ export default function PerformanceScreen({
     // update note color of latest attempt
     // console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current);
     const newNoteColor = intonationToNoteColor(intonation, expNoteIndex);
+
+    if(!noteTracking.current[expNoteIndex]){
+      noteTracking.current[expNoteIndex]={
+        initial_time:0,
+        started:false,
+        intune:false,
+      }; 
+    }
+    const noteState=noteTracking.current[expNoteIndex];
+    if(!noteState.started){//if current note just started mark if intial attempt is sharp/flat, then mark as started
+      if(intonation>ADVANCE_THRESHOLD) performanceMetrics.current.sharp_ct++;
+      else if(intonation<-ADVANCE_THRESHOLD) performanceMetrics.current.flat_ct++;
+      noteState.started=true;
+      noteState.initial_time=performance.now();
+    }
+    if(!noteState.intune && Math.abs(intonation) < ADVANCE_THRESHOLD){//then calc time it took to tune
+      performanceMetrics.current.tune_time += (performance.now()-noteState.initial_time);
+      performanceMetrics.current.tune_ct++;
+      noteState.intune=true;
+    }
+
     
     // Check if color actually changed to avoid unnecessary re-renders/bridge traffic
     if (noteColorsRef.current[expNoteIndex]?.color !== newNoteColor.color) {
@@ -147,6 +196,33 @@ export default function PerformanceScreen({
       // update beat to move cursor 
       scheduleBeatUpdate(beat); 
     }
+    else{
+      setPerformanceComplete(true)
+    }
+  }
+
+  const saveCurrentPerformance = async() => {
+    const user = await getCurrentUser();
+    if (!user) {
+      console.log('No user logged in');
+      alert('Please log in to save performance data');
+      return;
+    }
+    
+    const performanceData: PerformanceDataNotebyNote = {
+      id: Date.now().toString(),
+      scoreName: score || 'unknown',
+      timestamp: new Date().toISOString(),
+      tempo: bpm,
+      numsharp: performanceMetrics.current.sharp_ct,
+      numflat: performanceMetrics.current.flat_ct,
+      avgtunetime: performanceMetrics.current.tune_ct>0 ? performanceMetrics.current.tune_time/performanceMetrics.current.tune_ct : 0,
+    };
+    
+    await savePerformanceData(performanceData);
+    setPerformanceSaved(true);
+    console.log('Performance saved successfully');
+    alert('Performance saved successfully!');
   }
 
   const handleTimePitchUpdate = (estTime: number, freq: number) => {
@@ -221,6 +297,21 @@ export default function PerformanceScreen({
           {state.playing ? "Listening..." : "Play"}
         </Text>
       </TouchableOpacity>
+
+      {/* Save Performance button */}
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.saveButton,
+                (!performanceComplete || performanceSaved) && styles.disabledButton,
+              ]}
+              onPress={saveCurrentPerformance}
+              disabled={!performanceComplete || performanceSaved}
+            >
+              <Text style={styles.buttonText}>
+                {performanceSaved ? "Performance Saved ✓" : "Save Performance"}
+              </Text>
+            </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.button}
