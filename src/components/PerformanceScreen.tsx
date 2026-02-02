@@ -26,6 +26,8 @@ interface PerformanceScreenProps {
 // Semitone based params
 const ADVANCE_THRESHOLD = 0.2;
 const MAX_INPUT_DEVIATION = 16;
+const MIN_ADVANCE_TIME = 10; // ms
+const SAME_PITCH_WAIT_FRACTION = 0.5;
 
 let AudioPerformanceModule: any;
 if (Platform.OS === "android") {
@@ -51,6 +53,7 @@ export default function PerformanceScreen({
   const noteColorsRef = useRef<NoteColor[]>([]);
   const csvDataRef = useRef<CSVRow[]>([]); 
   const pitchBufferRef = useRef<number[]>([]); // Buffer for median filtering
+  const lastAdvanceTimeRef = useRef<number>(0);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [testInput, setTestInput] = useState<number>(0);
@@ -98,6 +101,7 @@ export default function PerformanceScreen({
     expNoteIdxRef.current = 0;
     noteColorsRef.current = [];
     pitchBufferRef.current = []; // Reset buffer
+    lastAdvanceTimeRef.current = Date.now();
 
     const base = score.replace(/\.musicxml$/, "");
     const csvUri = getScoreCSVData(base);
@@ -159,8 +163,30 @@ export default function PerformanceScreen({
 
     // if attempt within range, advance note
     if (Math.abs(intonation) < ADVANCE_THRESHOLD) {
+      const now = Date.now();
+      const timeSinceLastAdvance = now - lastAdvanceTimeRef.current;
+
+      // Check general time constraint
+      if (timeSinceLastAdvance < MIN_ADVANCE_TIME) return;
+
+      // Check same pitch class constraint
+      if (expNoteIndex + 1 < noteTable.length) {
+        const currentNote = noteTable[expNoteIndex];
+        const nextNote = noteTable[expNoteIndex + 1];
+
+        // If next note is same pitch class (e.g. C4 and C5, or same note)
+        if (currentNote.midi % 12 === nextNote.midi % 12) {
+          const expectedDuration = nextNote.refTime - currentNote.refTime;
+          // Wait fraction of the time between notes
+          if (timeSinceLastAdvance < expectedDuration * 1000 * SAME_PITCH_WAIT_FRACTION) {
+            return;
+          }
+        }
+      }
+
       // console.log("Abs of", intonation, "was within threshold", ADVANCE_THRESHOLD);
       expNoteIdxRef.current = expNoteIndex + 1;
+      lastAdvanceTimeRef.current = now;
       pitchBufferRef.current = []; // Reset buffer for next note
     } 
 
