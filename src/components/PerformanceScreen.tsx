@@ -23,7 +23,9 @@ interface PerformanceScreenProps {
   state: any;
 }
 
+// Semitone based params
 const ADVANCE_THRESHOLD = 0.2;
+const MAX_INPUT_DEVIATION = 16;
 
 let AudioPerformanceModule: any;
 if (Platform.OS === "android") {
@@ -48,6 +50,7 @@ export default function PerformanceScreen({
   const expNoteIdxRef = useRef<number>(0);
   const noteColorsRef = useRef<NoteColor[]>([]);
   const csvDataRef = useRef<CSVRow[]>([]); 
+  const pitchBufferRef = useRef<number[]>([]); // Buffer for median filtering
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [testInput, setTestInput] = useState<number>(0);
@@ -94,6 +97,7 @@ export default function PerformanceScreen({
 
     expNoteIdxRef.current = 0;
     noteColorsRef.current = [];
+    pitchBufferRef.current = []; // Reset buffer
 
     const base = score.replace(/\.musicxml$/, "");
     const csvUri = getScoreCSVData(base);
@@ -111,6 +115,7 @@ export default function PerformanceScreen({
 
   const handlePitchUpdate = (freq: number) => {
     // console.log("Pitch update:", freq);
+    if (freq <= 0) return;
 
     const noteTable: CSVRow[] = csvDataRef.current;
     const expNoteIndex = expNoteIdxRef.current;
@@ -119,7 +124,23 @@ export default function PerformanceScreen({
 
     const targetNote = noteTable[expNoteIndex];
     
-    const intonation: number = calculateIntonation(freq, targetNote);
+    // 1. Convert to MIDI
+    const detectedMidi = 69 + 12 * Math.log2(freq / 440);
+
+    // 2. Outlier Rejection (> 16 semitones from target)
+    if (Math.abs(detectedMidi - targetNote.midi) > MAX_INPUT_DEVIATION) {
+        return;
+    }
+
+    // 3. Median Buffering
+    const buffer = pitchBufferRef.current;
+    buffer.push(detectedMidi);
+    if (buffer.length > 5) buffer.shift(); // Keep last 5 samples
+
+    const sorted = [...buffer].sort((a, b) => a - b);
+    const medianMidi = sorted[Math.floor(sorted.length / 2)];
+
+    const intonation: number = calculateIntonation(medianMidi, targetNote);
     // silence or no note
     if (Number.isNaN(intonation)) return;
 
@@ -140,6 +161,7 @@ export default function PerformanceScreen({
     if (Math.abs(intonation) < ADVANCE_THRESHOLD) {
       // console.log("Abs of", intonation, "was within threshold", ADVANCE_THRESHOLD);
       expNoteIdxRef.current = expNoteIndex + 1;
+      pitchBufferRef.current = []; // Reset buffer for next note
     } 
 
     if (expNoteIdxRef.current < noteTable.length) {
@@ -167,7 +189,8 @@ export default function PerformanceScreen({
     const beat = targetNote.beat;
     scheduleBeatUpdate(beat);
 
-    const intonation = calculateIntonation(freq, targetNote);
+    const midi = freq > 0 ? 69 + 12 * Math.log2(freq / 440) : NaN;
+    const intonation = calculateIntonation(midi, targetNote);
     
     // silence or no note
     if (Number.isNaN(intonation)) return;
@@ -176,7 +199,6 @@ export default function PerformanceScreen({
     // console.log("Intonation", intonation);
     const newNoteColor = intonationToNoteColor(intonation, expNoteIndex);
     
-    // Check if color actually changed to avoid unnecessary re-renders/bridge traffic
     if (noteColorsRef.current[expNoteIndex]?.color !== newNoteColor.color) {
         noteColorsRef.current[expNoteIndex] = newNoteColor;
         dispatch({
@@ -185,16 +207,12 @@ export default function PerformanceScreen({
         });
     }
   } 
-  function calculateIntonation(freq: number, targetNote: CSVRow) {
-    if (freq < 0) {
-      return NaN;
-    }
-
-    const midi = 69 + 12 * Math.log2(freq / 440);
-    const intonation = targetNote.midi - midi;
-
+  
+  function calculateIntonation(detectedMidi: number, targetNote: CSVRow) {
+    if (Number.isNaN(detectedMidi)) return NaN;
+    const intonation = detectedMidi - targetNote.midi;
     return intonation % 12;
-}
+  }
 
   const testNbnOnce = () => {
     handlePitchUpdate(testInput);
