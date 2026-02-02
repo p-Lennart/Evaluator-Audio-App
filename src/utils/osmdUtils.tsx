@@ -318,8 +318,8 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
             {
               autoResize: true,
               backend: "svg",
-              drawTitle: true,
-              drawPartNames: true,
+              drawTitle: false,
+              drawPartNames: false,
               followCursor: true,
             }
           );
