@@ -205,7 +205,9 @@ export function applyNoteColors(
 
   // fast lookup map from index -> color
   const colorMap = new Map<number, string>();
-  (noteColors || []).forEach((n) => colorMap.set(n.index, n.color));
+  (noteColors || [])
+    .filter((n) => n != null)
+    .forEach((n) => colorMap.set(n.index, n.color));
 
   // Clear previous colors for notes not in map
   // allNotes.forEach((gNote) => {
@@ -365,7 +367,7 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
 
             // Build fast lookup map
             const colorMap = new Map();
-            (noteColors || []).forEach(n => colorMap.set(n.index, n.color));
+            (noteColors || []).filter(n => n != null).forEach(n => colorMap.set(n.index, n.color));
 
             // Apply colors
             allGraphicalNotes.forEach((gNote, idx) => {
@@ -567,7 +569,6 @@ export function buildOsmdHtmlForNative(mxmlString: string) {
   `;
 }
 
-
 /**
  * Handles messages sent from the OSMD WebView back to React Native.
  *
@@ -603,7 +604,7 @@ export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
         // console.log(`[WebView] Applied ${data.count} note color updates`);
         // Optional dispatch: dispatch({ type: "color_notes_applied", count: data.count });
         break;
-      
+
       // ---- Cursor movement confirmation ----
       case "cursorMovedAck":
         // console.log(`[WebView] Cursor moved to beat ${data.targetBeats}`);
@@ -618,4 +619,3 @@ export const onHandleOsmdMessageForNative = (raw: string, dispatch: any) => {
     console.error("Failed to parse WebView message", e, raw);
   }
 };
-
