@@ -9,12 +9,6 @@ import RNPickerSelect from "react-native-picker-select";
 import React, { useEffect } from "react";
 import Icon from "react-native-vector-icons/FontAwesome";
 import scoreToMidi from "../score_name_to_data_map/scoreToMidi";
-import {
-  musicXmlUploadWeb,
-  musicXmlUploadNative,
-} from "../utils/fileSelectorUtils";
-import { unifiedScoreMap } from "../score_name_to_data_map/unifiedScoreMap";
-import path from "path";
 
 export function Score_Select({
   // Data passed from App.tsx
@@ -96,47 +90,6 @@ export function Score_Select({
         />
 
       </View>
-
-      {/* Upload WAV file feature */}
-      <Animated.Text style={{ color: textStyle, marginTop: 12 }}>
-        Or upload a new score:
-      </Animated.Text>
-      <Animated.View
-        style={[
-          styles.input,
-          {
-            borderBottomWidth: 2,
-            borderBottomColor: borderStyle,
-            paddingBottom: 24,
-          },
-        ]}
-      >
-        {/* If on browser render upload field for web*/}
-        {Platform.OS === "web" ? (
-          <input
-            type="file"
-            accept=".musicxml"
-            onChange={(e) => musicXmlUploadWeb(e, state.scores, dispatch)}
-            style={{ color: "#000" }}
-            disabled={true}
-          />
-        ) : (
-          // Else render upload field for mobile
-          <Animated.View>
-            <TouchableOpacity
-              onPress={() => musicXmlUploadNative(state.scores, dispatch)}
-              disabled={true}
-              style={[...button_format, styles.disabledButton]}
-            >
-              <Animated.Text
-                style={{ color: button_text_style, fontWeight: "bold" }}
-              >
-                Upload File
-              </Animated.Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </Animated.View>
     </View>
   );
 }

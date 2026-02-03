@@ -276,27 +276,6 @@ export default function PerformanceScreen({
       >
         <Text style={styles.buttonText}>Stop</Text>
       </TouchableOpacity>
-
-
-      {/* Temporary inputs for testing cursor movement */}
-      <TextInput
-        value={testInput.toString()}
-        onChangeText={(text => setTestInput(parseFloat(text)))}
-        keyboardType="numeric"
-        placeholder="Frame value"
-      />
-
-      <TouchableOpacity 
-        style={[
-          styles.button,
-          (state.score === "" || !state.playing) &&
-            styles.disabledButton,
-        ]}
-        onPress={testNbnOnce}
-        disabled={state.score === "" || !state.playing} // Disabled when no score is selected or not playing performance
-      >
-      <Text style={styles.buttonText}>NBN: Feed Test Frame</Text>
-      </TouchableOpacity>
     </View>
   );
 }
