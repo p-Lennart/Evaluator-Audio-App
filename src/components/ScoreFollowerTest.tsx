@@ -425,32 +425,28 @@ export default function ScoreFollowerTest({
 
   const restartPlayback = async () => {
     await togglePause(true); // Ensure playback is paused before restarting
-    
+
     if (!liveFile) return;
-    setPerformanceComplete(false);
-    setPerformanceSaved(false);
-    nextIndexRef.current = 0;
-    resetCursorToStart();
-    dispatch({ type: "SET_NOTE_COLORS", payload: [] });
-    // if (!state.playing) {
-    //   dispatch({ type: "start/stop" });
-    // }
+
+    if (state.playing) {
+      dispatch({ type: "start/stop" }); // flip playing off so runFollower can toggle it on again
+    }
 
     try {
       if (soundRef.current) {
         const status = await soundRef.current.getStatusAsync();
         if (status.isLoaded) {
           await soundRef.current.stopAsync();
-          await soundRef.current.setPositionAsync(0);
-          //await soundRef.current.playAsync();
-          return;
         }
+        await soundRef.current.unloadAsync();
       }
-
-      //await createSoundAndPlay();
     } catch (err) {
       console.error("Restart Error:", err);
+    } finally {
+      soundRef.current = null;
     }
+
+    await runFollower();
   };
 
   return (
