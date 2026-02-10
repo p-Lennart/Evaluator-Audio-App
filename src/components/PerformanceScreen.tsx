@@ -70,10 +70,17 @@ export default function PerformanceScreen({
   const noteTracking=useRef<{//also track when notes start/stop for measurements
     [note_ind:number]: {
       initial_time:number;
-      started:boolean;
+      end_time?:number;
       intune:boolean;
+      intonations:number[];//add list of intonation to get avg instead of initial
     }
   }>({});
+
+  const [displayMetrics, setDisplayMetric] = useState<{
+    numsharp:number,
+    numflat:number,
+    avgtunetime:number,
+  }|null>(null);
 
   const scheduleBeatUpdate = (beat: number) => {
     latestBeat.current = beat;
@@ -102,6 +109,23 @@ export default function PerformanceScreen({
       setIsProcessing(false);
     };
   }, [dispatch]); 
+
+
+  const finalCalc = (noteIndex:number)=>{//make func for final calculations before changing notes(index++)
+    const note=noteTracking.current[noteIndex];
+    if(!note||note.intune) return; //check
+    if(note.intonations.length==0) return;
+
+    note.end_time=performance.now();
+    note.intune=true;
+
+    const median=note.intonations.sort((a,b)=>a-b)[Math.floor(note.intonations.length/2)];
+    if(median>ADVANCE_THRESHOLD) performanceMetrics.current.sharp_ct++;
+    else if(median<-ADVANCE_THRESHOLD) performanceMetrics.current.flat_ct++;
+
+    performanceMetrics.current.tune_time+= note.end_time-note.initial_time;
+    performanceMetrics.current.tune_ct++;
+  };
 
   const runPerformance = async () => {
     const hasPermission = await requestMicrophonePermission();
@@ -157,24 +181,13 @@ export default function PerformanceScreen({
 
     if(!noteTracking.current[expNoteIndex]){
       noteTracking.current[expNoteIndex]={
-        initial_time:0,
-        started:false,
+        initial_time:performance.now(),
         intune:false,
+        intonations:[],
       }; 
     }
-    const noteState=noteTracking.current[expNoteIndex];
-    if(!noteState.started){//if current note just started mark if intial attempt is sharp/flat, then mark as started
-      if(intonation>ADVANCE_THRESHOLD) performanceMetrics.current.sharp_ct++;
-      else if(intonation<-ADVANCE_THRESHOLD) performanceMetrics.current.flat_ct++;
-      noteState.started=true;
-      noteState.initial_time=performance.now();
-    }
-    if(!noteState.intune && Math.abs(intonation) < ADVANCE_THRESHOLD){//then calc time it took to tune
-      performanceMetrics.current.tune_time += (performance.now()-noteState.initial_time);
-      performanceMetrics.current.tune_ct++;
-      noteState.intune=true;
-    }
 
+    noteTracking.current[expNoteIndex].intonations.push(intonation);//add curr intonation to list 
     
     // Check if color actually changed to avoid unnecessary re-renders/bridge traffic
     if (noteColorsRef.current[expNoteIndex]?.color !== newNoteColor.color) {
@@ -188,6 +201,8 @@ export default function PerformanceScreen({
     // if attempt within range, advance note
     if (Math.abs(intonation) < ADVANCE_THRESHOLD) {
       // console.log("Abs of", intonation, "was within threshold", ADVANCE_THRESHOLD);
+      finalCalc(expNoteIndex);//do final calc only when advancing to next note
+
       expNoteIdxRef.current = expNoteIndex + 1;
     } 
 
@@ -197,6 +212,13 @@ export default function PerformanceScreen({
       scheduleBeatUpdate(beat); 
     }
     else{
+      const avgtime= performanceMetrics.current.tune_ct>0 ? performanceMetrics.current.tune_time/performanceMetrics.current.tune_ct : 0;
+      setDisplayMetric({
+        numsharp: performanceMetrics.current.sharp_ct,
+        numflat: performanceMetrics.current.flat_ct,
+        avgtunetime: avgtime
+      });
+
       setPerformanceComplete(true)
     }
   }
@@ -318,6 +340,14 @@ export default function PerformanceScreen({
         onPress={() => {
            AudioPerformanceModule.stopProcessing();
            dispatch({ type: "start/stop" });
+
+
+           const avgtime= performanceMetrics.current.tune_ct>0 ? performanceMetrics.current.tune_time/performanceMetrics.current.tune_ct : 0;
+          setDisplayMetric({
+            numsharp: performanceMetrics.current.sharp_ct,
+            numflat: performanceMetrics.current.flat_ct,
+            avgtunetime: avgtime
+           });
         }}
         disabled={state.score === "" || !state.playing}
       >
@@ -344,6 +374,22 @@ export default function PerformanceScreen({
       >
       <Text style={styles.buttonText}>NBN: Feed Test Frame</Text>
       </TouchableOpacity>
+
+    
+      {displayMetrics && (
+      <View style={styles.status}>
+        <Text style={styles.label}>
+          Notes overall sharp: {displayMetrics.numsharp}
+        </Text>
+        <Text style={styles.label}>
+          Notes overall flat: {displayMetrics.numflat}
+        </Text>
+        <Text style={styles.label}>
+          Avg time to tune: {displayMetrics.avgtunetime.toFixed(2)} ms
+        </Text>
+      </View>
+    )}
+
     </View>
   );
 }
