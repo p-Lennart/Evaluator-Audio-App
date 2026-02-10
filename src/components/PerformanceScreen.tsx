@@ -56,6 +56,7 @@ export default function PerformanceScreen({
   const lastAdvanceTimeRef = useRef<number>(0);
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [testInput, setTestInput] = useState<number>(0);
   const updateScheduled = useRef<boolean>(false);
   const latestBeat = useRef<number>(0);
@@ -111,8 +112,41 @@ export default function PerformanceScreen({
     console.log("Isplaying=", state.playing, "\nDispatch start/stop");
     dispatch({ type: "SET_NOTE_COLORS", payload: [] });
     dispatch({ type: "start/stop" });
+    setIsPaused(false);
 
     // Start Native Audio Engine
+    if (AudioPerformanceModule?.startProcessing) {
+      await AudioPerformanceModule.startProcessing();
+      setIsProcessing(true);
+    }
+  };
+
+  const togglePause = async () => {
+    if (!AudioPerformanceModule?.stopProcessing || !AudioPerformanceModule?.startProcessing) return;
+
+    if (isPaused) {
+      await AudioPerformanceModule.startProcessing();
+      setIsPaused(false);
+    } else {
+      await AudioPerformanceModule.stopProcessing();
+      setIsPaused(true);
+    }
+  };
+
+  const restartPerformance = async () => {
+    if (!AudioPerformanceModule?.stopProcessing || !AudioPerformanceModule?.startProcessing) return;
+
+    await AudioPerformanceModule.stopProcessing();
+    setIsProcessing(false);
+    setIsPaused(false);
+
+    expNoteIdxRef.current = 0;
+    noteColorsRef.current = [];
+    pitchBufferRef.current = [];
+    lastAdvanceTimeRef.current = Date.now();
+    dispatch({ type: "SET_NOTE_COLORS", payload: [] });
+    dispatch({ type: "SET_ESTIMATED_BEAT", payload: 0 });
+
     await AudioPerformanceModule.startProcessing();
     setIsProcessing(true);
   };
@@ -271,11 +305,41 @@ export default function PerformanceScreen({
         onPress={() => {
            AudioPerformanceModule.stopProcessing();
            dispatch({ type: "start/stop" });
+           setIsPaused(false);
         }}
         disabled={state.score === "" || !state.playing}
       >
         <Text style={styles.buttonText}>Stop</Text>
       </TouchableOpacity>
+
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.halfButton,
+            styles.pauseButton,
+            (!state.playing && !isPaused) && styles.disabledButton,
+          ]}
+          onPress={togglePause}
+          disabled={!state.playing && !isPaused}
+        >
+          <Text style={styles.buttonText}>{isPaused ? "Resume" : "Pause"}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.halfButton,
+            styles.lastHalfButton,
+            styles.restartButton,
+            (!state.playing && !isPaused) && styles.disabledButton,
+          ]}
+          onPress={restartPerformance}
+          disabled={!state.playing && !isPaused}
+        >
+          <Text style={styles.buttonText}>Restart</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -287,6 +351,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C3E50",
     borderRadius: 8,
     alignItems: "center",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  halfButton: {
+    flex: 1,
+    marginRight: 8,
+  },
+  lastHalfButton: {
+    marginRight: 0,
+  },
+  pauseButton: {
+    backgroundColor: "#8E44AD",
+  },
+  restartButton: {
+    backgroundColor: "#34495E",
   },
   saveButton: {
     marginTop: 8,
