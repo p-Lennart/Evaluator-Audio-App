@@ -4,17 +4,17 @@ import { prepareAudio } from "../utils/audioUtils";
 import { NoteColor } from "../utils/musicXmlUtils";
 import { NativeModules, Platform } from "react-native";
 
-const OCTAVE_OFF_THRESHOLD = 2;
-const SEMITONE_THRESHOLD = 2;
+export const OCTAVE_OFF_THRESHOLD = 2;
+export const SEMITONE_THRESHOLD = 2;
 
 const AGGREGATE_DIVISOR = 1.1;
 const AGGREGATE_DEFAULT_SIZE = 10;
 
-const COLOR_NEUTRAL = "#000000";
-const COLOR_SHARP = "#00ff00";
-const COLOR_FLAT = "#ff0000";
+export const COLOR_NEUTRAL = "#000000";
+export const COLOR_SHARP = "#00ff00";
+export const COLOR_FLAT = "#ff0000";
 
-const MISTAKE_THRESHOLD = 0.5;
+export const MISTAKE_THRESHOLD = 0.5;
 
 
 let PitchDetectionModule: any;
