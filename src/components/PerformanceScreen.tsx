@@ -8,12 +8,20 @@ import { requestMicrophonePermission } from "../utils/liveMicUtils";
 import { CENSFeatures } from "../audio/FeaturesCENS";
 import { FeaturesConstructor } from "../audio/Features";
 import { CSVRow, loadCsvInfo } from '../utils/csvParsingUtils';
-import { 
-  getScoreCSVData,
-} from "../score_name_to_data_map/unifiedScoreMap";
+import { getScoreCSVData } from "../score_name_to_data_map/unifiedScoreMap";
 
-import { intonationToNoteColor } from '../audio/Intonation';
+import { 
+  intonationToNoteColor,
+  calculateSingleNoteIntonation, 
+  listMedian,
+  hzToMidi,
+  MISTAKE_THRESHOLD,
+  SEMITONE_FILTER_THRESHOLD
+} from '../audio/Intonation';
 import { NoteColor } from "../utils/musicXmlUtils";
+
+import { PerformanceData } from "./PerformanceStats";
+import { getCurrentUser, savePerformanceData } from "../utils/accountUtils";
 
 interface PerformanceScreenProps {
   score: string; // Selected score name
@@ -24,8 +32,7 @@ interface PerformanceScreenProps {
 }
 
 // Semitone based params
-const ADVANCE_THRESHOLD = 0.2;
-const MAX_INPUT_DEVIATION = 16;
+const ADVANCE_THRESHOLD = MISTAKE_THRESHOLD;
 const MIN_ADVANCE_TIME = 10; // ms
 const SAME_PITCH_WAIT_FRACTION = 0.5;
 
@@ -52,12 +59,21 @@ export default function PerformanceScreen({
   const expNoteIdxRef = useRef<number>(0);
   const noteColorsRef = useRef<NoteColor[]>([]);
   const csvDataRef = useRef<CSVRow[]>([]); 
+
   const pitchBufferRef = useRef<number[]>([]); // Buffer for median filtering
+  const noteMistakesRef = useRef<number[]>([]); // Buffer for mistake categorization
+
   const lastAdvanceTimeRef = useRef<number>(0);
+  
+  const intonationDataRef = useRef<number[]>([]);
+  const durationRatioDataRef = useRef<number[]>([]);
+
+  const [performanceComplete, setPerformanceComplete] = useState(false); // State to determine if plackback of a score is finished or not
+  const [performanceSaved, setPerformanceSaved] = useState(false); // State to track if performance has been saved
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [testInput, setTestInput] = useState<number>(0);
+  
   const updateScheduled = useRef<boolean>(false);
   const latestBeat = useRef<number>(0);
   const lastDispatchedBeat = useRef<number | null>(null);
@@ -75,7 +91,6 @@ export default function PerformanceScreen({
       });
     }
   };
-
 
   useEffect(() => {
     console.log("Adding subscription to audio events");
@@ -102,7 +117,11 @@ export default function PerformanceScreen({
     expNoteIdxRef.current = 0;
     noteColorsRef.current = [];
     pitchBufferRef.current = []; // Reset buffer
+    noteMistakesRef.current = [];
+
     lastAdvanceTimeRef.current = Date.now();
+    intonationDataRef.current = [];
+    durationRatioDataRef.current = [];
 
     const base = score.replace(/\.musicxml$/, "");
     const csvUri = getScoreCSVData(base);
@@ -113,6 +132,8 @@ export default function PerformanceScreen({
     dispatch({ type: "SET_NOTE_COLORS", payload: [] });
     dispatch({ type: "start/stop" });
     setIsPaused(false);
+    setPerformanceComplete(false);
+    setPerformanceSaved(false);
 
     // Start Native Audio Engine
     if (AudioPerformanceModule?.startProcessing) {
@@ -139,19 +160,26 @@ export default function PerformanceScreen({
     await AudioPerformanceModule.stopProcessing();
     setIsProcessing(false);
     setIsPaused(false);
-
+    
     expNoteIdxRef.current = 0;
     noteColorsRef.current = [];
-    pitchBufferRef.current = [];
+    pitchBufferRef.current = []; // Reset buffer
+    noteMistakesRef.current = [];
+
     lastAdvanceTimeRef.current = Date.now();
+    intonationDataRef.current = [];
+    durationRatioDataRef.current = [];
+    
     dispatch({ type: "SET_NOTE_COLORS", payload: [] });
     dispatch({ type: "SET_ESTIMATED_BEAT", payload: 0 });
-
+    setPerformanceComplete(false);
+    setPerformanceSaved(false);
+    
     await AudioPerformanceModule.startProcessing();
     setIsProcessing(true);
   };
 
-  const handlePitchUpdate = (freq: number) => {
+  const handlePitchUpdate = async (freq: number) => {
     // console.log("Pitch update:", freq);
     if (freq <= 0) return;
 
@@ -163,24 +191,20 @@ export default function PerformanceScreen({
     const targetNote = noteTable[expNoteIndex];
     
     // 1. Convert to MIDI
-    const detectedMidi = 69 + 12 * Math.log2(freq / 440);
+    const detectedMidi = hzToMidi(freq)
 
-    // 2. Outlier Rejection (> 16 semitones from target)
-    if (Math.abs(detectedMidi - targetNote.midi) > MAX_INPUT_DEVIATION) {
-        return;
-    }
-
+    // 2. Octave-corrected gated intonation correction (gated by SEMITONE_FILTER_THRESHOLD, OCTAVE_FILTER_THRESHOLD) from Intonation.tsx
+    const sampleIntonation = calculateSingleNoteIntonation(detectedMidi, targetNote.midi);
+    // Silence or filtered note
+    if (Number.isNaN(sampleIntonation)) return;
+    
     // 3. Median Buffering
     const buffer = pitchBufferRef.current;
-    buffer.push(detectedMidi);
+    buffer.push(sampleIntonation);
     if (buffer.length > 5) buffer.shift(); // Keep last 5 samples
 
-    const sorted = [...buffer].sort((a, b) => a - b);
-    const medianMidi = sorted[Math.floor(sorted.length / 2)];
-
-    const intonation: number = calculateIntonation(medianMidi, targetNote);
-    // silence or no note
-    if (Number.isNaN(intonation)) return;
+    const intonation = listMedian(buffer);
+    console.log("[DEBUG] Into", intonation)
 
     // update note color of latest attempt
     // console.log("Intonation", intonation, intonationToNoteColor(intonation, expNoteIndex), noteColorsRef.current);
@@ -195,10 +219,17 @@ export default function PerformanceScreen({
         });
     }
 
-    // if attempt within range, advance note
-    if (Math.abs(intonation) < ADVANCE_THRESHOLD) {
+    // Don't advance note if out of range
+    if (Math.abs(intonation) > ADVANCE_THRESHOLD) {
+      // Add to mistake aggregate
+      noteMistakesRef.current.push(intonation);
+    }
+    else { // Advance note
       const now = Date.now();
       const timeSinceLastAdvance = now - lastAdvanceTimeRef.current;
+
+      let noteIntonation = 0.0;
+      let noteDurationRatio = 1.0;
 
       // Check general time constraint
       if (timeSinceLastAdvance < MIN_ADVANCE_TIME) return;
@@ -207,27 +238,51 @@ export default function PerformanceScreen({
       if (expNoteIndex + 1 < noteTable.length) {
         const currentNote = noteTable[expNoteIndex];
         const nextNote = noteTable[expNoteIndex + 1];
+        
+        let expectedDuration = (nextNote.refTime - currentNote.refTime) * 1000;
+        // TEST: uncomment to follow user tempo
+        // expectedDuration *= median(durationRatioDataRef.current.slice(-5));
 
         // If next note is same pitch class (e.g. C4 and C5, or same note)
         if (currentNote.midi % 12 === nextNote.midi % 12) {
-          const expectedDuration = nextNote.refTime - currentNote.refTime;
           // Wait fraction of the time between notes
-          if (timeSinceLastAdvance < expectedDuration * 1000 * SAME_PITCH_WAIT_FRACTION) {
+          if (timeSinceLastAdvance < expectedDuration * SAME_PITCH_WAIT_FRACTION) {
             return;
           }
         }
+
+        // Store duration of actual advance time to expected duration
+        noteDurationRatio = timeSinceLastAdvance / expectedDuration;
       }
 
+      // ADVANCE LOGIC
       // console.log("Abs of", intonation, "was within threshold", ADVANCE_THRESHOLD);
+
+      // Performance Metrics
+      if (noteMistakesRef.current.length > 0) noteIntonation = listMedian(noteMistakesRef.current);
+      // Set intonation for attempt according to mistake buffer for note
+      intonationDataRef.current.push(noteIntonation);
+      // Set duration ratio for attempt based on above check
+      durationRatioDataRef.current.push(noteDurationRatio);
+      
+      // Move note pointer
       expNoteIdxRef.current = expNoteIndex + 1;
       lastAdvanceTimeRef.current = now;
-      pitchBufferRef.current = []; // Reset buffer for next note
+      
+      // Reset buffers for next note
+      pitchBufferRef.current = []; 
+      noteMistakesRef.current = [];
     } 
 
     if (expNoteIdxRef.current < noteTable.length) {
       const beat = noteTable[expNoteIdxRef.current].beat;
       // update beat to move cursor 
       scheduleBeatUpdate(beat); 
+    } else {
+      await AudioPerformanceModule.stopProcessing();
+      setIsProcessing(false);
+      setIsPaused(false);
+      setPerformanceComplete(true);
     }
   }
 
@@ -249,8 +304,8 @@ export default function PerformanceScreen({
     const beat = targetNote.beat;
     scheduleBeatUpdate(beat);
 
-    const midi = freq > 0 ? 69 + 12 * Math.log2(freq / 440) : NaN;
-    const intonation = calculateIntonation(midi, targetNote);
+    const midi = hzToMidi(freq);
+    const intonation = calculateSingleNoteIntonation(midi, targetNote.midi);
     
     // silence or no note
     if (Number.isNaN(intonation)) return;
@@ -260,24 +315,38 @@ export default function PerformanceScreen({
     const newNoteColor = intonationToNoteColor(intonation, expNoteIndex);
     
     if (noteColorsRef.current[expNoteIndex]?.color !== newNoteColor.color) {
-        noteColorsRef.current[expNoteIndex] = newNoteColor;
-        dispatch({
-            type: "ADD_NOTE_COLOR",
-            payload: { color: newNoteColor, index: expNoteIndex },
-        });
+      noteColorsRef.current[expNoteIndex] = newNoteColor;
+      dispatch({
+          type: "ADD_NOTE_COLOR",
+          payload: { color: newNoteColor, index: expNoteIndex },
+      });
     }
-  } 
+  }
   
-  function calculateIntonation(detectedMidi: number, targetNote: CSVRow) {
-    if (Number.isNaN(detectedMidi)) return NaN;
-    const intonation = detectedMidi - targetNote.midi;
-    return intonation % 12;
-  }
+  const saveCurrentPerformance = async () => {
+    const user = await getCurrentUser();
+    if (!user) {
+      console.log('No user logged in');
+      alert('Please log in to save performance data');
+      return;
+    }
 
-  const testNbnOnce = () => {
-    handlePitchUpdate(testInput);
-  }
+    const performanceData: PerformanceData = {
+      id: Date.now().toString(),
+      scoreName: score || 'unknown',
+      timestamp: new Date().toISOString(),
+      tempo: bpm,
+      intonationData: intonationDataRef.current,
+      durationRatioData: durationRatioDataRef.current, 
+      csvData: csvDataRef.current,
+    };
 
+    await savePerformanceData(performanceData);
+    setPerformanceSaved(true);
+    console.log('Performance saved successfully');
+    alert('Performance saved successfully!');
+  };
+  
   return (
     <View>
       {/* Show tempo of selected score to be played */}
@@ -300,6 +369,7 @@ export default function PerformanceScreen({
         </Text>
       </TouchableOpacity>
 
+      {/* Stop Performance button */}
       <TouchableOpacity
         style={styles.button}
         onPress={() => {
@@ -312,6 +382,7 @@ export default function PerformanceScreen({
         <Text style={styles.buttonText}>Stop</Text>
       </TouchableOpacity>
 
+      {/* Resume/Pause Performance button */}
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={[
@@ -326,6 +397,7 @@ export default function PerformanceScreen({
           <Text style={styles.buttonText}>{isPaused ? "Resume" : "Pause"}</Text>
         </TouchableOpacity>
 
+        {/* Restart Performance button */}
         <TouchableOpacity
           style={[
             styles.button,
@@ -338,6 +410,21 @@ export default function PerformanceScreen({
           disabled={!state.playing && !isPaused}
         >
           <Text style={styles.buttonText}>Restart</Text>
+        </TouchableOpacity>
+
+        {/* Save Performance button */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.saveButton,
+            (!performanceComplete || performanceSaved) && styles.disabledButton,
+          ]}
+          onPress={saveCurrentPerformance}
+          disabled={!performanceComplete || performanceSaved}
+        >
+          <Text style={styles.buttonText}>
+            {performanceSaved ? "Performance Saved ✓" : "Save Performance"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

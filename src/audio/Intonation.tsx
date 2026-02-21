@@ -4,18 +4,15 @@ import { prepareAudio } from "../utils/audioUtils";
 import { NoteColor } from "../utils/musicXmlUtils";
 import { NativeModules, Platform } from "react-native";
 
-export const OCTAVE_OFF_THRESHOLD = 2;
-export const SEMITONE_THRESHOLD = 2;
-
-const AGGREGATE_DIVISOR = 1.1;
-const AGGREGATE_DEFAULT_SIZE = 10;
-
+export const MISTAKE_THRESHOLD = 0.5;
+export const SEMITONE_FILTER_THRESHOLD = 6;
+export const OCTAVE_FILTER_THRESHOLD = 2;
 export const COLOR_NEUTRAL = "#000000";
 export const COLOR_SHARP = "#00ff00";
 export const COLOR_FLAT = "#ff0000";
 
-export const MISTAKE_THRESHOLD = 0.5;
-
+const AGGREGATE_DIVISOR = 1.1;
+const AGGREGATE_DEFAULT_SIZE = 10;
 
 let PitchDetectionModule: any;
 if (Platform.OS === "android") {
@@ -26,7 +23,84 @@ if (Platform.OS === "android") {
   }
 }
 
-function windowNumPerTs(
+export function calculateSingleNoteIntonation(detectedMidi: number, scoreMidi: number): number {
+  if (Number.isNaN(detectedMidi)) return NaN;
+  
+    const diff = detectedMidi - scoreMidi;
+    const octavesCorrected = Math.round(diff / 12);
+    const intonation = diff + (octavesCorrected * -12);
+   
+    if (Math.abs(octavesCorrected) > OCTAVE_FILTER_THRESHOLD) {
+      // console.log("[DEBUG] Octave filter", octavesCorrected);
+      return NaN;
+    };
+    if (Math.abs(intonation) > SEMITONE_FILTER_THRESHOLD) {
+      // console.log("[DEBUG] Semitone filter", intonation);
+      return NaN;
+    }
+    return intonation;
+}
+
+export function intonationToNoteColor(intonation: number, noteIdx: number): NoteColor {
+  let color: string;
+  if (Math.abs(intonation) < MISTAKE_THRESHOLD) {
+    color = COLOR_NEUTRAL;
+  } else if (intonation > 0) {
+    color = COLOR_SHARP;
+  } else {
+    color = COLOR_FLAT;
+  }
+
+  return { index: noteIdx, color: color };
+}
+
+export function hzToMidi(frequency: number): number {
+  if (frequency < 0) {
+    console.log(`Frequency must be a nonnegative number: ${frequency}`);
+    return NaN;
+  }
+
+  const midi = 69 + 12 * Math.log2(frequency / 440);
+  return midi;
+}
+
+export function listMedian(numbers: number[]): number {
+  if (numbers.length === 0) return 0;
+
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  } else {
+    return sorted[mid];
+  }
+}
+
+export async function calculateIntonation(
+  audioSamples: Float32Array,
+  scorePitchesCol: number[], // midi column of csv
+  audioTimesCol: number[], // warped timestamps (or ref_ts column of csv for testing)
+  sampleRate: number,
+  winLen: number,
+  hopLen: number = winLen,
+) {
+  console.log("-- Calculating Intonation");
+  const audioF0s = await _calculateF0s(audioSamples, sampleRate, winLen, hopLen);
+  const audioPitches = audioF0s.map((frq) => hzToMidi(frq));
+
+  console.log("-- Calculating Intonation: got", audioF0s.length, "windows");
+  return _estimatePitchesAtTimestamps(
+    audioTimesCol,
+    scorePitchesCol,
+    audioPitches,
+    sampleRate,
+    hopLen,
+    false,
+  );
+}
+
+function _windowNumPerTs(
   timestamps: number[],
   lastWindow: number,
   sampleRate: number,
@@ -42,31 +116,9 @@ function windowNumPerTs(
 
     return windowNum;
   });
-}
+} 
 
-function listMedian(numbers: number[]): number | null {
-  if (numbers.length === 0) return null;
-
-  const sorted = [...numbers].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-
-  if (sorted.length % 2 === 0) {
-    return (sorted[mid - 1] + sorted[mid]) / 2;
-  } else {
-    return sorted[mid];
-  }
-}
-
-function hzToMidi(frequency: number): number {
-  if (frequency < 0) {
-    throw new Error(`Frequency must be a nonnegative number: ${frequency}`);
-  }
-
-  const midi = 69 + 12 * Math.log2(frequency / 440);
-  return midi;
-}
-
-async function calculateF0s(
+async function _calculateF0s(
   audioSamples: Float32Array,
   sampleRate: number,
   winLen: number,
@@ -115,7 +167,7 @@ async function calculateF0s(
   return f0s;
 }
 
-function estimatePitchesAtTimestamps(
+function _estimatePitchesAtTimestamps(
   timestampCol: number[],
   scorePitchCol: number[],
   audioPitches: number[],
@@ -129,7 +181,7 @@ function estimatePitchesAtTimestamps(
 
   // Convert timestamp -> sample no., sample no. -> window no. using hop len
   const lastWindow = audioPitches.length - 1;
-  const _windowNums = windowNumPerTs(
+  const _windowNums = _windowNumPerTs(
     timestampCol,
     lastWindow,
     sampleRate,
@@ -175,20 +227,9 @@ function estimatePitchesAtTimestamps(
       windowNum,
       windowNum + aggregateSize,
     );
-    let diffAggregate = rawAggregate.map((candidate) => {
-      if (isNaN(candidate)) return undefined;
+    let diffAggregate = rawAggregate.map((candidate) => calculateSingleNoteIntonation(candidate, scorePitch));
 
-      let diff = candidate - scorePitch;
-      if (Math.abs(diff) > 12) {
-        if (Math.floor(diff / 12) > OCTAVE_OFF_THRESHOLD) return undefined;
-        diff = diff % 12;
-      }
-
-      if (Math.abs(diff) > SEMITONE_THRESHOLD) return undefined;
-      return diff;
-    });
-
-    diffAggregate = diffAggregate.filter((element) => element !== undefined);
+    diffAggregate = diffAggregate.filter((element) => !Number.isNaN(element));
     const intonationDiff = listMedian(diffAggregate);
     const pitchEstimate = scorePitch + listMedian(diffAggregate);
 
@@ -206,29 +247,6 @@ function estimatePitchesAtTimestamps(
   });
 
   return pitchEstimates;
-}
-
-export async function calculateIntonation(
-  audioSamples: Float32Array,
-  scorePitchesCol: number[], // midi column of csv
-  audioTimesCol: number[], // warped timestamps (or ref_ts column of csv for testing)
-  sampleRate: number,
-  winLen: number,
-  hopLen: number = winLen,
-) {
-  console.log("-- Calculating Intonation");
-  const audioF0s = await calculateF0s(audioSamples, sampleRate, winLen, hopLen);
-  const audioPitches = audioF0s.map((frq) => hzToMidi(frq));
-
-  console.log("-- Calculating Intonation: got", audioF0s.length, "windows");
-  return estimatePitchesAtTimestamps(
-    audioTimesCol,
-    scorePitchesCol,
-    audioPitches,
-    sampleRate,
-    hopLen,
-    false,
-  );
 }
 
 export async function testIntonation(
@@ -267,17 +285,4 @@ export async function testIntonation(
   console.log(`New table with (win, hop) (${intonationParams}):`, newTable);
 
   return intonation;
-}
-
-export function intonationToNoteColor(intonation: number, noteIdx: number) {
-  let color: string;
-  if (Math.abs(intonation) < MISTAKE_THRESHOLD) {
-    color = COLOR_NEUTRAL;
-  } else if (intonation > 0) {
-    color = COLOR_SHARP;
-  } else {
-    color = COLOR_FLAT;
-  }
-
-  return { index: noteIdx, color: color };
 }

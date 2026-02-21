@@ -26,7 +26,8 @@ import {
   unifiedScoreMap
 } from "../score_name_to_data_map/unifiedScoreMap";
 
-import { getCurrentUser, savePerformanceData, PerformanceData } from "../utils/accountUtils";
+import { PerformanceData } from "../components/PerformanceStats"
+import { getCurrentUser, savePerformanceData } from "../utils/accountUtils";
 import { calculateIntonation, intonationToNoteColor, testIntonation } from "../audio/Intonation";
 import { NoteColor } from "../utils/musicXmlUtils";
 
